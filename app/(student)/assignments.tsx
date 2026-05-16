@@ -33,7 +33,7 @@ export default function StudentAssignments() {
 
   const load = useCallback(async () => {
     if (!studentProfile?.class_id) { setLoading(false); return; }
-    const { data } = await getStudentAssignments(studentProfile.class_id);
+    const { data } = await getStudentAssignments(studentProfile.class_id, studentProfile.id);
     setAssignments(data || []);
     setLoading(false);
   }, [studentProfile]);
@@ -82,17 +82,31 @@ export default function StudentAssignments() {
         }
         renderItem={({ item }) => {
           const { label, variant } = getDueStatus(item.due_date);
+          const sub = item.mySubmission;
+          const isGraded = sub?.status === 'graded';
+          const isSubmitted = sub?.status === 'submitted';
           return (
-            <Card style={styles.card} onPress={() => { setSelected(item); setSubmissionText(''); }}>
+            <Card style={[styles.card, isGraded && { borderColor: `${Colors.success}40` }]}
+              onPress={() => { if (!isGraded) { setSelected(item); setSubmissionText(sub?.content || ''); } }}>
               <View style={styles.cardHeader}>
                 <View style={styles.typeBadge}>
                   <Text style={styles.typeText}>{item.assignment_type}</Text>
                 </View>
-                <Badge label={label} variant={variant} size="sm" />
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  {isGraded ? <Badge label={`Graded: ${sub.score}pts`} variant="success" size="sm" /> :
+                   isSubmitted ? <Badge label="Submitted" variant="default" size="sm" /> :
+                   <Badge label={label} variant={variant} size="sm" />}
+                </View>
               </View>
               <Text style={styles.title}>{item.title}</Text>
               {item.subjects ? <Text style={styles.subtitle}>{item.subjects.name}</Text> : null}
-              {item.description ? <Text style={styles.desc} numberOfLines={2}>{item.description}</Text> : null}
+              {isGraded && sub?.feedback ? (
+                <View style={styles.feedbackBox}>
+                  <MaterialIcons name="chat-bubble-outline" size={13} color={Colors.success} />
+                  <Text style={styles.feedbackText} numberOfLines={2}>{sub.feedback}</Text>
+                </View>
+              ) : null}
+              {!isGraded && item.description ? <Text style={styles.desc} numberOfLines={2}>{item.description}</Text> : null}
               <View style={styles.footer}>
                 <View style={styles.footerItem}>
                   <MaterialIcons name="star" size={14} color={Colors.textMuted} />
@@ -104,10 +118,12 @@ export default function StudentAssignments() {
                     <Text style={styles.footerText}>{formatDate(item.due_date)}</Text>
                   </View>
                 ) : null}
-                <View style={styles.submitBtn}>
-                  <Text style={styles.submitText}>Submit</Text>
-                  <MaterialIcons name="arrow-forward" size={14} color={Colors.student} />
-                </View>
+                {!isGraded ? (
+                  <View style={styles.submitBtn}>
+                    <Text style={styles.submitText}>{isSubmitted ? 'Resubmit' : 'Submit'}</Text>
+                    <MaterialIcons name="arrow-forward" size={14} color={Colors.student} />
+                  </View>
+                ) : null}
               </View>
             </Card>
           );
@@ -171,6 +187,8 @@ const styles = StyleSheet.create({
   footerText: { fontSize: FontSize.xs, color: Colors.textMuted },
   submitBtn: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 },
   submitText: { fontSize: FontSize.sm, color: Colors.student, fontWeight: FontWeight.semibold },
+  feedbackBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 4, backgroundColor: Colors.successBg, padding: Spacing.xs, borderRadius: BorderRadius.sm },
+  feedbackText: { flex: 1, fontSize: FontSize.xs, color: Colors.success, lineHeight: 18 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: Spacing.lg, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: Spacing.md, gap: Spacing.sm },

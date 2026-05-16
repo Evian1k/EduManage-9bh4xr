@@ -108,14 +108,24 @@ export async function getStudentAttendance(studentId: string, classId: string) {
   return { data, error };
 }
 
-export async function getStudentAssignments(classId: string) {
+export async function getStudentAssignments(classId: string, studentId?: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('assignments')
-    .select('*, subjects(name), school_users!teacher_id(user_id, user_profiles!user_id(username))')
+    .select('*, subjects(name), school_users!teacher_id(user_id, user_profiles!user_id(username)), assignment_submissions(id, status, score, feedback, submitted_at)')
     .eq('class_id', classId)
     .eq('is_published', true)
     .order('due_date');
+  // If studentId provided, filter submissions to only this student's
+  if (data && studentId) {
+    return {
+      data: data.map((a: any) => ({
+        ...a,
+        mySubmission: (a.assignment_submissions || []).find((s: any) => s.student_id === studentId) || null,
+      })),
+      error,
+    };
+  }
   return { data, error };
 }
 

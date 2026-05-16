@@ -40,7 +40,7 @@ export async function getLibraryBooks(schoolId: string, search?: string) {
   if (search) {
     query = query.or(`title.ilike.%${search}%,author.ilike.%${search}%,isbn.ilike.%${search}%`);
   }
-  return supabase.from('library_books').select('*').eq('school_id', schoolId).order('title');
+  return query;
 }
 
 export async function createBook(schoolId: string, book: Partial<LibraryBook>) {
@@ -82,13 +82,25 @@ export async function borrowBook(schoolId: string, data: {
   due_date: string;
 }) {
   const supabase = getSupabaseClient();
+  // Decrement available copies directly
+  const { data: bookData } = await supabase
+    .from('library_books')
+    .select('available_copies')
+    .eq('id', data.book_id)
+    .single();
+  if (!bookData || bookData.available_copies <= 0) {
+    return { data: null, error: new Error('No copies available') };
+  }
   const { data: record, error } = await supabase
     .from('borrow_records')
     .insert({ ...data, school_id: schoolId, status: 'borrowed' })
     .select()
     .single();
   if (!error) {
-    await supabase.rpc('decrement_book_copies', { p_book_id: data.book_id });
+    await supabase
+      .from('library_books')
+      .update({ available_copies: bookData.available_copies - 1 })
+      .eq('id', data.book_id);
   }
   return { data: record, error };
 }
@@ -102,10 +114,18 @@ export async function returnBook(recordId: string, bookId: string) {
     .select()
     .single();
   if (!error) {
-    await supabase
+    // Increment available copies on return
+    const { data: bookData } = await supabase
       .from('library_books')
-      .update({ available_copies: supabase.rpc as any })
-      .eq('id', bookId);
+      .select('available_copies, total_copies')
+      .eq('id', bookId)
+      .single();
+    if (bookData) {
+      await supabase
+        .from('library_books')
+        .update({ available_copies: Math.min(bookData.total_copies, bookData.available_copies + 1) })
+        .eq('id', bookId);
+    }
   }
   return { data: record, error };
 }
