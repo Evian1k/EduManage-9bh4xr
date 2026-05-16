@@ -18,6 +18,14 @@ export interface School {
   is_active: boolean;
   trial_ends_at: string;
   created_at: string;
+  // Branding
+  primary_color?: string;
+  secondary_color?: string;
+  theme_preference?: string;
+  logo_url?: string;
+  motto?: string;
+  website_enabled?: boolean;
+  website_plan?: string;
 }
 
 export interface SchoolUser {
@@ -28,6 +36,11 @@ export interface SchoolUser {
   employee_id?: string;
   department?: string;
   is_active: boolean;
+  employment_status?: string;
+  employment_start_date?: string;
+  employment_end_date?: string;
+  archived?: boolean;
+  notes?: string;
 }
 
 export interface StudentProfile {
@@ -45,11 +58,14 @@ export interface AppContextType {
   schoolUser: SchoolUser | null;
   studentProfile: StudentProfile | null;
   isPlatformAdmin: boolean;
+  rulebookAccepted: boolean;
   loading: boolean;
   refreshContext: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const RULEBOOK_VERSION = '1.0';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -57,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [school, setSchool] = useState<School | null>(null);
   const [schoolUser, setSchoolUser] = useState<SchoolUser | null>(null);
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [rulebookAccepted, setRulebookAccepted] = useState(true); // default true, checked below
   const [loading, setLoading] = useState(true);
 
   const loadUserContext = async () => {
@@ -65,6 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSchool(null);
       setSchoolUser(null);
       setStudentProfile(null);
+      setRulebookAccepted(true);
       setLoading(false);
       return;
     }
@@ -73,7 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabaseClient();
 
     try {
-      // Check platform admin first
+      // 1. Check platform admin
       const { data: adminData } = await supabase
         .from('platform_admins')
         .select('id')
@@ -85,11 +103,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSchool(null);
         setSchoolUser(null);
         setStudentProfile(null);
+        setRulebookAccepted(true);
         setLoading(false);
         return;
       }
 
-      // Check school user
+      // 2. Check school user
       const { data: schoolUserData } = await supabase
         .from('school_users')
         .select('*, schools(*)')
@@ -103,6 +122,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUserRole(suData.role);
         setSchool(schools as School);
 
+        // 3. Rulebook check — only for admin-level roles
+        const adminRoles = ['admin', 'ict_manager'];
+        if (adminRoles.includes(suData.role)) {
+          const { data: rbData } = await supabase
+            .from('school_rule_acceptance')
+            .select('id')
+            .eq('school_id', suData.school_id)
+            .eq('accepted_by_user_id', user.id)
+            .eq('rulebook_version', RULEBOOK_VERSION)
+            .eq('accepted', true)
+            .maybeSingle();
+          setRulebookAccepted(!!rbData);
+        } else {
+          setRulebookAccepted(true);
+        }
+
+        // 4. Student profile
         if (suData.role === 'student') {
           const { data: stuData } = await supabase
             .from('students')
@@ -116,9 +152,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUserRole(null);
         setSchool(null);
         setSchoolUser(null);
+        setRulebookAccepted(true);
       }
     } catch (e) {
-      console.error('AppContext load error:', e);
+      console.error('[AppContext] load error:', e);
     }
 
     setLoading(false);
@@ -136,6 +173,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         schoolUser,
         studentProfile,
         isPlatformAdmin: userRole === 'platform_admin',
+        rulebookAccepted,
         loading,
         refreshContext: loadUserContext,
       }}

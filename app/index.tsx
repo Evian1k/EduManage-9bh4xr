@@ -6,7 +6,7 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 export default function RootScreen() {
   const { user, loading: authLoading } = useAuth();
-  const { userRole, loading: contextLoading } = useAppContext();
+  const { userRole, rulebookAccepted, loading: contextLoading } = useAppContext();
 
   const loading = authLoading || contextLoading;
 
@@ -15,6 +15,11 @@ export default function RootScreen() {
   if (!user) return <Redirect href="/login" />;
 
   if (!userRole) return <Redirect href="/register" />;
+
+  // Admin roles must accept rulebook before accessing dashboard
+  if (!rulebookAccepted && (userRole === 'admin' || userRole === 'ict_manager')) {
+    return <Redirect href="/rulebook" />;
+  }
 
   if (userRole === 'platform_admin') return <Redirect href="/(superadmin)/" />;
   if (userRole === 'admin' || userRole === 'ict_manager') return <Redirect href="/(admin)/" />;
@@ -25,6 +30,5 @@ export default function RootScreen() {
   if (userRole === 'librarian') return <Redirect href="/(librarian)/" />;
   if (userRole === 'nurse' || userRole === 'health_officer') return <Redirect href="/(nurse)/" />;
 
-  // Fallback for unknown roles
   return <Redirect href="/(admin)/" />;
 }

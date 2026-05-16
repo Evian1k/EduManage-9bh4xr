@@ -23,6 +23,7 @@ export default function RootLayout() {
               <Stack.Screen name="(ict)" options={{ headerShown: false }} />
               <Stack.Screen name="(librarian)" options={{ headerShown: false }} />
               <Stack.Screen name="(nurse)" options={{ headerShown: false }} />
+              <Stack.Screen name="rulebook" options={{ headerShown: false }} />
             </Stack>
           </AppProvider>
         </AuthProvider>
