@@ -61,6 +61,12 @@ export const STAFF_ROLES: UserRole[] = [
   'boarding_mistress',
 ];
 
+/**
+ * Alias for {@link STAFF_ROLES}. Exported under a more descriptive name so
+ * call sites can disambiguate from {@link ADMIN_ROLES} / {@link ALL_ROLES}.
+ */
+export const ALL_STAFF_ROLES: UserRole[] = STAFF_ROLES;
+
 /** Roles that can administer a school (manage users, settings, billing). */
 export const ADMIN_ROLES: UserRole[] = [
   'school_owner',

@@ -1,0 +1,152 @@
+# EduManage — Nightly Database Backup
+#
+# Runs every day at 01:00 UTC. Connects directly to the Supabase Postgres
+# instance via pg_dump, streams the dump to an S3 bucket with a 30-day
+# lifecycle policy, and verifies the dump is restorable with
+# `pg_restore --list`. On any failure, posts a Slack alert.
+#
+# Required GitHub secrets:
+#   SUPABASE_DB_URL          — e.g. postgresql://postgres:[PW]@db.[REF].supabase.co:5432/postgres
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_S3_BACKUP_BUCKET     — e.g. edumanage-db-backups
+#   AWS_REGION               — e.g. us-east-1
+#   SLACK_WEBHOOK_URL
+
+name: Backup Database
+
+on:
+  schedule:
+    # 01:00 UTC every day.
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+env:
+  RETENTION_DAYS: '30'
+  PG_DUMP_VERSION: '15'
+
+jobs:
+  backup:
+    name: pg_dump → S3 (30-day retention)
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🛠️ Install PostgreSQL client tools
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-${{ env.PG_DUMP_VERSION }}
+
+      - name: 🗓️ Compute backup key
+        id: key
+        run: |
+          TS="$(date -u +%Y%m%dT%H%M%SZ)"
+          DATE="$(date -u +%Y/%m/%d)"
+          echo "ts=${TS}" >> "$GITHUB_OUTPUT"
+          echo "key=backups/${DATE}/edumanage-${TS}.dump" >> "$GITHUB_OUTPUT"
+          echo "object=s3://${{ secrets.AWS_S3_BACKUP_BUCKET }}/backups/${DATE}/edumanage-${TS}.dump" >> "$GITHUB_OUTPUT"
+
+      - name: 💾 pg_dump → S3 (streamed, custom format)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # Stream pg_dump output directly to S3 — no local disk usage.
+          # --no-owner/--no-privileges make the dump portable across roles.
+          pg_dump \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --compress=9 \
+            --verbose \
+            "$DATABASE_URL" \
+            | aws s3 cp - "${{ steps.key.outputs.object }}" --expected-size 1073741824
+
+      - name: ✅ Verify backup integrity (pg_restore --list)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # Stream the object back through pg_restore --list. If the dump
+          # is corrupt, pg_restore exits non-zero.
+          aws s3 cp "${{ steps.key.outputs.object }}" - \
+            | pg_restore --list --no-password 2>&1 | tee /tmp/restore-list.txt
+          ENTRIES=$(grep -c '^;' /tmp/restore-list.txt || true)
+          OBJECTS=$(grep -cE '^[0-9]+;' /tmp/restore-list.txt || true)
+          if [ "$OBJECTS" -lt 50 ]; then
+            echo "::error::Backup appears truncated — only ${OBJECTS} objects found"
+            exit 1
+          fi
+          echo "Backup verified: ${OBJECTS} objects listed."
+
+      - name: 📊 Verify object lifecycle (30-day retention)
+        run: |
+          # Confirm the bucket has a lifecycle policy covering the backup prefix.
+          aws s3api get-bucket-lifecycle-configuration \
+            --bucket "${{ secrets.AWS_S3_BACKUP_BUCKET }}" \
+            | jq -e '.Rules | length > 0' \
+            || echo "::warning::No S3 lifecycle policy found — set 30-day expiration manually."
+
+      - name: 🧹 Prune local backups older than retention window
+        run: |
+          CUTOFF_DATE=$(date -u -d "${RETENTION_DAYS} days ago" +%Y-%m-%d)
+          echo "Pruning backups older than ${CUTOFF_DATE}..."
+          # List objects and delete those whose key predates the cutoff.
+          aws s3api list-objects-v2 \
+            --bucket "${{ secrets.AWS_S3_BACKUP_BUCKET }}" \
+            --prefix 'backups/' \
+            --query 'Contents[?LastModified<`'"${CUTOFF_DATE}"'`].[Key]' \
+            --output text \
+            | while read -r KEY; do
+              if [ -n "$KEY" ]; then
+                echo "Deleting expired backup: $KEY"
+                aws s3 rm "s3://${{ secrets.AWS_S3_BACKUP_BUCKET }}/${KEY}"
+              fi
+            done
+
+      - name: 📝 Append summary
+        if: always()
+        run: |
+          echo "### Database Backup Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Object:** \`${{ steps.key.outputs.object }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Timestamp (UTC):** ${{ steps.key.outputs.ts }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Retention:** ${RETENTION_DAYS} days" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Format:** pg_dump custom (compressed)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🚨 Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 EduManage database backup FAILED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🚨 EduManage nightly database backup FAILED*\nObject: `${{ steps.key.outputs.object }}`\nInvestigate immediately — production data may not be recoverable past the previous backup.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

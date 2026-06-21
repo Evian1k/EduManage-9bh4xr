@@ -1,0 +1,151 @@
+# EduManage — Deploy Edge Functions
+#
+# Triggered when any change to supabase/functions/** is pushed to `main`.
+# Deploys ALL edge functions and applies the full set of runtime secrets
+# (AI providers, email/SMS gateways, payment providers, cron + monitoring).
+#
+# Required GitHub secrets (configure under Settings → Secrets → Actions):
+#   SUPABASE_ACCESS_TOKEN      — personal access token from supabase dashboard
+#   SUPABASE_PROJECT_REF       — target project reference id
+#   AI_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY
+#   EMAIL_PROVIDER, SENDGRID_API_KEY, MAILGUN_API_KEY, MAILGUN_DOMAIN
+#   SMS_PROVIDER, AFRICAS_TALKING_USERNAME, AFRICAS_TALKING_API_KEY, AFRICAS_TALKING_SENDER_ID
+#   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
+#   CRON_API_KEY
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+#   MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY,
+#   MPESA_ENVIRONMENT, MPESA_CALLBACK_URL
+#   EXPO_PUBLIC_SENTRY_DSN
+
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-functions.yml'
+
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-functions-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+jobs:
+  deploy:
+    name: Deploy all edge functions + secrets
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: 🔐 Authenticate Supabase CLI
+        run: supabase login --token "${{ secrets.SUPABASE_ACCESS_TOKEN }}"
+
+      - name: 🔗 Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      # ────────────────────────────────────────────────────────────────────
+      # Deploy every edge function in the repo.
+      # ────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy edge functions
+        run: |
+          set -euo pipefail
+          FUNCTIONS=(
+            ai-assistant
+            send-notifications
+            verify-domain
+            send-push-notification
+            seed-demo
+            stripe-checkout
+            stripe-webhook
+            mpesa-stk
+            mpesa-callback
+          )
+          for fn in "${FUNCTIONS[@]}"; do
+            echo "::group::Deploying function: $fn"
+            supabase functions deploy "$fn" --no-verify-jwt
+            echo "::endgroup::"
+          done
+
+      # ────────────────────────────────────────────────────────────────────
+      # Apply runtime secrets. `supabase secrets set` is idempotent.
+      # ────────────────────────────────────────────────────────────────────
+      - name: 🔑 Set AI provider secrets
+        run: |
+          supabase secrets set \
+            AI_PROVIDER="${{ secrets.AI_PROVIDER }}" \
+            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
+
+      - name: 🔑 Set email provider secrets
+        run: |
+          supabase secrets set \
+            EMAIL_PROVIDER="${{ secrets.EMAIL_PROVIDER }}" \
+            SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" \
+            MAILGUN_API_KEY="${{ secrets.MAILGUN_API_KEY }}" \
+            MAILGUN_DOMAIN="${{ secrets.MAILGUN_DOMAIN }}"
+
+      - name: 🔑 Set SMS provider secrets
+        run: |
+          supabase secrets set \
+            SMS_PROVIDER="${{ secrets.SMS_PROVIDER }}" \
+            AFRICAS_TALKING_USERNAME="${{ secrets.AFRICAS_TALKING_USERNAME }}" \
+            AFRICAS_TALKING_API_KEY="${{ secrets.AFRICAS_TALKING_API_KEY }}" \
+            AFRICAS_TALKING_SENDER_ID="${{ secrets.AFRICAS_TALKING_SENDER_ID }}" \
+            TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" \
+            TWILIO_AUTH_TOKEN="${{ secrets.TWILIO_AUTH_TOKEN }}" \
+            TWILIO_FROM_NUMBER="${{ secrets.TWILIO_FROM_NUMBER }}"
+
+      - name: 🔑 Set cron + monitoring secrets
+        run: |
+          supabase secrets set \
+            CRON_API_KEY="${{ secrets.CRON_API_KEY }}" \
+            EXPO_PUBLIC_SENTRY_DSN="${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}"
+
+      - name: 🔑 Set Stripe secrets
+        run: |
+          supabase secrets set \
+            STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}"
+
+      - name: 🔑 Set M-Pesa secrets
+        run: |
+          supabase secrets set \
+            MPESA_CONSUMER_KEY="${{ secrets.MPESA_CONSUMER_KEY }}" \
+            MPESA_CONSUMER_SECRET="${{ secrets.MPESA_CONSUMER_SECRET }}" \
+            MPESA_SHORTCODE="${{ secrets.MPESA_SHORTCODE }}" \
+            MPESA_PASSKEY="${{ secrets.MPESA_PASSKEY }}" \
+            MPESA_ENVIRONMENT="${{ secrets.MPESA_ENVIRONMENT }}" \
+            MPESA_CALLBACK_URL="${{ secrets.MPESA_CALLBACK_URL }}"
+
+      - name: ✅ Summary
+        run: |
+          echo "### Edge Function Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed 9 functions to project \`${SUPABASE_PROJECT_REF}\`:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ai-assistant" >> "$GITHUB_STEP_SUMMARY"
+          echo "- send-notifications" >> "$GITHUB_STEP_SUMMARY"
+          echo "- verify-domain" >> "$GITHUB_STEP_SUMMARY"
+          echo "- send-push-notification" >> "$GITHUB_STEP_SUMMARY"
+          echo "- seed-demo" >> "$GITHUB_STEP_SUMMARY"
+          echo "- stripe-checkout" >> "$GITHUB_STEP_SUMMARY"
+          echo "- stripe-webhook" >> "$GITHUB_STEP_SUMMARY"
+          echo "- mpesa-stk" >> "$GITHUB_STEP_SUMMARY"
+          echo "- mpesa-callback" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Applied secrets: AI_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, EMAIL_PROVIDER, SENDGRID_API_KEY, MAILGUN_API_KEY, MAILGUN_DOMAIN, SMS_PROVIDER, AFRICAS_TALKING_*, TWILIO_*, CRON_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MPESA_*, EXPO_PUBLIC_SENTRY_DSN" >> "$GITHUB_STEP_SUMMARY"

@@ -3,7 +3,7 @@ import { RequireRole } from '@/components/auth/RequireRole';
 
 export default function SecretaryLayout() {
   return (
-    <RequireRole allowed={[secretary, school_owner, principal, administrator'] as any}>
+    <RequireRole allowed={['secretary', 'school_owner', 'principal', 'administrator'] as any}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="announcements" />

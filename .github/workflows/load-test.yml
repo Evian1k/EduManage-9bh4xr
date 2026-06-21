@@ -1,0 +1,102 @@
+# EduManage — Nightly Load Test (k6)
+#
+# Runs every night at 02:00 UTC. Executes a comprehensive k6 load test
+# against the staging environment with three scenarios:
+#   - realistic_load: ramps to 10,000 virtual users over 10 minutes.
+#   - ai_burst:       sustained 50 RPS against the AI edge function.
+#   - login_storm:    500 RPS against auth.login for 5 minutes.
+#
+# The k6 script defines a custom counter `tenant_isolation_violations`
+# which increments whenever a request returns data from a different
+# tenant than expected. The threshold `count == 0` is enforced — if
+# even a single violation occurs, the workflow fails.
+
+name: Load Test
+
+on:
+  schedule:
+    # 02:00 UTC every day.
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      vu_count:
+        description: 'Number of VUs for the realistic_load scenario'
+        required: false
+        default: '1000'
+
+concurrency:
+  group: load-test
+  cancel-in-progress: false
+
+env:
+  K6_VERSION: 'v0.51.0'
+  K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
+
+jobs:
+  load-test:
+    name: Run k6 (1000 VUs · 10 min)
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup k6
+        uses: grafana/k6-action@v0.3.1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+          filename: loadtest/edumanage-loadtest.js
+        env:
+          K6_SYSTEM_ENV_VARS: '1'
+          SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AI_FUNCTION_URL: ${{ secrets.AI_FUNCTION_URL }}
+          TEST_USER_EMAIL: ${{ secrets.LOADTEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.LOADTEST_USER_PASSWORD }}
+          TEST_SCHOOL_ID_A: ${{ secrets.LOADTEST_SCHOOL_ID_A }}
+          TEST_SCHOOL_ID_B: ${{ secrets.LOADTEST_SCHOOL_ID_B }}
+
+      - name: 📤 Upload k6 results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: |
+            *.json
+            *.xml
+            loadtest-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: 🚨 Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🔥 EduManage load test FAILED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🔥 EduManage nightly load test FAILED*\nLikely cause: tenant_isolation_violations > 0, SLO threshold breached, or scenario errored.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: 📊 Append summary
+        if: always()
+        run: |
+          echo "### Load Test Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Scenarios:** realistic_load (1000 VUs), ai_burst (50 RPS), login_storm (500 RPS)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Duration:** 10 minutes" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Critical threshold:** \`tenant_isolation_violations == 0\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Run:** ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"

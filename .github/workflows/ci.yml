@@ -1,0 +1,75 @@
+# EduManage — Continuous Integration
+#
+# Runs on every push to main/develop and every pull request. Verifies the
+# project compiles, lints cleanly, and that the unit + tenant-guard test
+# suites pass. Integration tests that require a live Supabase instance
+# (tenant-isolation, permissions, ai-integration) are excluded here; they
+# run in a separate workflow against the staging environment.
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel in-progress runs when a new commit is pushed to the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  build-lint-test:
+    name: Install · Typecheck · Lint · Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔍 Typecheck (tsc --noEmit)
+        run: pnpm exec tsc --noEmit
+
+      - name: 🧹 Lint
+        run: pnpm lint
+
+      - name: 🧪 Run unit tests
+        env:
+          CI: 'true'
+        run: |
+          pnpm exec jest \
+            --testPathIgnorePatterns='/node_modules/' \
+            --testPathIgnorePatterns='tests/tenant-isolation.test.ts' \
+            --testPathIgnorePatterns='tests/permissions.test.ts' \
+            --testPathIgnorePatterns='tests/ai-integration.test.ts' \
+            --ci \
+            --reporters=default \
+            --reporters=github-actions
+
+      - name: 📤 Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore

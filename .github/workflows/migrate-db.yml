@@ -1,0 +1,83 @@
+# EduManage — Apply Database Migrations
+#
+# Triggered when any SQL migration under supabase/migrations/** is pushed
+# to `main`. Runs `supabase db push` against the production project, which
+# applies new migrations in lexicographic order. The job targets the
+# `production` environment so GitHub environment protection rules (e.g.
+# required reviewers) can be applied.
+
+name: Migrate Database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/migrate-db.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: migrate-db-production
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+jobs:
+  migrate:
+    name: supabase db push (production)
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: 🔐 Authenticate Supabase CLI
+        run: supabase login --token "${{ secrets.SUPABASE_ACCESS_TOKEN }}"
+
+      - name: 🔗 Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: 📋 Dry-run (preview changes)
+        run: supabase db push --dry-run
+
+      - name: 🚀 Apply migrations to production
+        run: supabase db push
+
+      - name: ✅ Record migration status
+        run: |
+          echo "### Database Migration Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Project: \`${SUPABASE_PROJECT_REF}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Applied by: @${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Run \`supabase migration list\` in the dashboard to verify the new migration history." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🚨 Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 EduManage DB migration FAILED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🚨 EduManage DB migration FAILED*\nProject: `${{ env.SUPABASE_PROJECT_REF }}`\nCommit: `${{ github.sha }}`\nActor: @${{ github.actor }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
