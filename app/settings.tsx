@@ -11,6 +11,8 @@ import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
+import { LanguagePicker } from '@/components/LanguagePicker';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const APP_VERSION = '1.0.0';
 const BUILD_TYPE = 'production';
@@ -157,6 +159,16 @@ export default function SettingsScreen() {
         >
           {/* ─── APPEARANCE ─── */}
           <SectionCard title="Appearance">
+            <SettingRow
+              icon="language"
+              iconColor={Colors.primary}
+              iconBg={Colors.schoolAdminBg}
+              label="Language"
+              value=""
+              hint="Choose your preferred language"
+              showDivider
+              rightSlot={<LanguagePicker compact />}
+            />
             <SettingRow
               icon="dark-mode"
               iconColor={Colors.primary}

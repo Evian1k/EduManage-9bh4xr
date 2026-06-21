@@ -32,6 +32,8 @@ EduManage is a complete school management platform that serves **multiple school
 - **Custom domain** — `portal.yourschool.edu` or `yourschool.edumanage.com`
 - **17 role types** — from school owner down to groundskeeper
 - **Full module suite** — academics, finance, HR, LMS, library, medical, transport, boarding, AI, analytics
+- **Multi-language support (i18n)** — English, Swahili, French, Arabic (RTL), Spanish
+- **Real-time notifications** — live unread counts via Supabase Realtime WebSocket
 
 The platform scales to **10 million+ users worldwide** with partitioned audit logs, materialized views, and 5-layer tenant isolation.
 
@@ -291,6 +293,7 @@ User action (e.g. "Create Student")
 | React | 19.0.0 | UI library |
 | TypeScript | ~5.8.3 | Type safety |
 | Supabase JS SDK | ^2.50.0 | Backend client |
+| i18n (custom) | 5 languages | English, Swahili, French, Arabic (RTL), Spanish |
 
 ### Backend
 | Technology | Purpose |
