@@ -80,7 +80,7 @@ export default function TeacherAI() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <Header title="EduAssist AI" subtitle="Powered by OnSpace AI" accentColor={Colors.teacher} />
+      <Header title="EduAssist AI" subtitle="Powered by EduManage AI" accentColor={Colors.teacher} />
 
       {/* Feature selector */}
       <View style={styles.featureRow}>

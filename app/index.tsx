@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/template';
 import { useAppContext } from '@/hooks/useAppContext';
@@ -7,28 +7,24 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 export default function RootScreen() {
   const { user, loading: authLoading } = useAuth();
   const { userRole, rulebookAccepted, loading: contextLoading } = useAppContext();
-
   const loading = authLoading || contextLoading;
-
   if (loading) return <LoadingScreen message="Starting EduManage..." />;
-
-  if (!user) return <Redirect href="/login" />;
-
-  if (!userRole) return <Redirect href="/register" />;
-
-  // Admin roles must accept rulebook before accessing dashboard
-  if (!rulebookAccepted && (userRole === 'admin' || userRole === 'ict_manager')) {
-    return <Redirect href="/rulebook" />;
+  if (!user) return <Redirect href={'/login' as any} />;
+  if (!userRole) return <Redirect href={'/register' as any} />;
+  const rulebookRoles = ['administrator','ict_manager','school_owner','principal','deputy_principal','bursar'];
+  if (!rulebookAccepted && rulebookRoles.includes(userRole)) return <Redirect href={'/rulebook' as any} />;
+  switch (userRole) {
+    case 'platform_admin': return <Redirect href={'/(superadmin)/' as any} />;
+    case 'school_owner': case 'principal': case 'deputy_principal': case 'administrator': return <Redirect href={'/(admin)/' as any} />;
+    case 'ict_manager': return <Redirect href={'/(ict)/' as any} />;
+    case 'teacher': return <Redirect href={'/(teacher)/' as any} />;
+    case 'student': return <Redirect href={'/(student)/' as any} />;
+    case 'parent': return <Redirect href={'/(parent)/' as any} />;
+    case 'secretary': return <Redirect href={'/(secretary)/' as any} />;
+    case 'bursar': return <Redirect href={'/(bursar)/' as any} />;
+    case 'librarian': return <Redirect href={'/(librarian)/' as any} />;
+    case 'nurse': return <Redirect href={'/(nurse)/' as any} />;
+    case 'boarding_master': case 'boarding_mistress': return <Redirect href={'/(boarding)/' as any} />;
+    default: return <Redirect href={'/(admin)/' as any} />;
   }
-
-  if (userRole === 'platform_admin') return <Redirect href="/(superadmin)/" />;
-  if (userRole === 'admin' || userRole === 'ict_manager') return <Redirect href="/(admin)/" />;
-  if (userRole === 'teacher' || userRole === 'timetable_officer' || userRole === 'discipline_officer') return <Redirect href="/(teacher)/" />;
-  if (userRole === 'student') return <Redirect href="/(student)/" />;
-  if (userRole === 'secretary' || userRole === 'receptionist' || userRole === 'clerk') return <Redirect href="/(secretary)/" />;
-  if (userRole === 'bursar' || userRole === 'accountant') return <Redirect href="/(bursar)/" />;
-  if (userRole === 'librarian') return <Redirect href="/(librarian)/" />;
-  if (userRole === 'nurse' || userRole === 'health_officer') return <Redirect href="/(nurse)/" />;
-
-  return <Redirect href="/(admin)/" />;
 }

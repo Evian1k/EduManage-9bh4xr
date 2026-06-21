@@ -1,12 +1,15 @@
 import { Stack } from 'expo-router';
+import { RequireRole } from '@/components/auth/RequireRole';
 
 export default function BursarLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="payments" />
-      <Stack.Screen name="fees" />
-      <Stack.Screen name="reports" />
-    </Stack>
+    <RequireRole allowed={[bursar, school_owner, principal, administrator'] as any}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="payments" />
+        <Stack.Screen name="fees" />
+        <Stack.Screen name="reports" />
+      </Stack>
+    </RequireRole>
   );
 }

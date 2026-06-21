@@ -1,4 +1,12 @@
+// EduManage — Staff lifecycle service (legacy compatibility shim)
+//
+// Wraps the `school_users` lifecycle operations: onboard, status updates,
+// and offboard. The audit log goes to `audit_logs` (the schema doesn't have
+// a `staff_transfer_log` table — we use the unified `audit_logs` instead).
+
 import { getSupabaseClient } from '@/template';
+import { ServiceResult } from '@/lib/types';
+import { logAuditEvent } from './audit.service';
 
 export type EmploymentStatus =
   | 'active'
@@ -10,209 +18,238 @@ export type EmploymentStatus =
   | 'on_leave';
 
 export interface StaffLifecycleUpdate {
-  employment_status: EmploymentStatus;
-  employment_end_date?: string;
+  employment_status?: EmploymentStatus;
+  employment_end_date?: string | null;
   transfer_status?: string;
   archived?: boolean;
   notes?: string;
   replacement_user_id?: string;
+  is_active?: boolean;
 }
 
-/**
- * Update a staff member's employment lifecycle status.
- * Creates an audit entry in staff_transfer_log automatically.
- */
-export async function updateStaffLifecycle(
-  schoolUserId: string,
-  schoolId: string,
-  update: StaffLifecycleUpdate,
-  performedBy: string,
-  reason?: string
-) {
-  const supabase = getSupabaseClient();
-
-  // Fetch current state for audit
-  const { data: current } = await supabase
-    .from('school_users')
-    .select('*')
-    .eq('id', schoolUserId)
-    .single();
-
-  const payload: any = { ...update };
-  if (update.employment_status !== 'active') {
-    payload.is_active = false;
-    payload.archived = true;
-    if (!update.employment_end_date) {
-      payload.employment_end_date = new Date().toISOString().split('T')[0];
-    }
-  } else {
-    payload.is_active = true;
-    payload.archived = false;
-    payload.employment_end_date = null;
-  }
-
-  const { data, error } = await supabase
-    .from('school_users')
-    .update(payload)
-    .eq('id', schoolUserId)
-    .select()
-    .single();
-
-  if (error) return { data: null, error };
-
-  // Write audit log
-  await supabase.from('staff_transfer_log').insert({
-    school_id: schoolId,
-    school_user_id: schoolUserId,
-    action: update.employment_status.toUpperCase(),
-    performed_by: performedBy,
-    old_values: current,
-    new_values: data,
-    notes: reason,
-  });
-
-  return { data, error: null };
-}
-
-/**
- * Reinstate a previously inactive staff member.
- */
-export async function reinstateStaff(
-  schoolUserId: string,
-  schoolId: string,
-  performedBy: string
-) {
-  return updateStaffLifecycle(
-    schoolUserId,
-    schoolId,
-    { employment_status: 'active', archived: false },
-    performedBy,
-    'Staff reinstated'
-  );
-}
-
-/**
- * Transfer a staff member (removes access from current school, preserves all historical data).
- */
-export async function initiateTransfer(
-  schoolUserId: string,
-  schoolId: string,
-  performedBy: string,
-  destination?: string
-) {
-  return updateStaffLifecycle(
-    schoolUserId,
-    schoolId,
-    {
-      employment_status: 'transferred',
-      transfer_status: destination || 'pending',
-      archived: true,
-    },
-    performedBy,
-    `Transfer initiated${destination ? ` to ${destination}` : ''}`
-  );
-}
-
-/**
- * Retire a staff member — preserves all records, removes login access.
- */
-export async function retireStaff(
-  schoolUserId: string,
-  schoolId: string,
-  performedBy: string,
-  replacementUserId?: string
-) {
-  const update: StaffLifecycleUpdate = {
-    employment_status: 'retired',
-    archived: true,
-  };
-  if (replacementUserId) update.replacement_user_id = replacementUserId;
-  return updateStaffLifecycle(schoolUserId, schoolId, update, performedBy, 'Staff retired');
-}
-
-/**
- * Suspend a staff member temporarily.
- */
-export async function suspendStaff(
-  schoolUserId: string,
-  schoolId: string,
-  performedBy: string,
-  reason: string
-) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('school_users')
-    .update({ is_active: false, employment_status: 'suspended', notes: reason })
-    .eq('id', schoolUserId)
-    .select()
-    .single();
-
-  if (!error) {
-    await supabase.from('staff_transfer_log').insert({
-      school_id: schoolId,
-      school_user_id: schoolUserId,
-      action: 'SUSPENDED',
-      performed_by: performedBy,
-      new_values: data,
-      notes: reason,
-    });
-  }
-  return { data, error };
-}
-
-/**
- * Get the staff transfer/lifecycle log for a school or specific staff member.
- */
-export async function getStaffAuditLog(schoolId: string, schoolUserId?: string) {
-  const supabase = getSupabaseClient();
-  let query = supabase
-    .from('staff_transfer_log')
-    .select(`
-      *,
-      school_users!school_user_id(
-        role, employee_id,
-        user_profiles(username, email)
-      ),
-      user_profiles!performed_by(username, email)
-    `)
-    .eq('school_id', schoolId)
-    .order('created_at', { ascending: false });
-
-  if (schoolUserId) {
-    query = query.eq('school_user_id', schoolUserId);
-  }
-
-  return query.limit(50);
+export interface StaffLifecycleRecord {
+  id: string;
+  school_id: string;
+  user_id: string;
+  role: string;
+  is_active: boolean;
+  metadata?: Record<string, unknown> | null;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
  * Get all staff with their lifecycle status for the admin view.
  */
-export async function getAllStaffWithLifecycle(schoolId: string) {
+export async function getStaffLifecycle(
+  schoolId: string,
+): Promise<ServiceResult<StaffLifecycleRecord[]>> {
   const supabase = getSupabaseClient();
-  return supabase
+  const { data, error } = await supabase
     .from('school_users')
-    .select(`
-      *,
-      user_profiles(id, username, email)
-    `)
+    .select('*, user_profiles(id, email, full_name)')
     .eq('school_id', schoolId)
     .neq('role', 'student')
-    .order('employment_status')
-    .order('created_at', { ascending: false });
+    .order('joined_at', { ascending: false });
+  if (error) return { data: null, error: error.message };
+  return { data: (data ?? []) as unknown as StaffLifecycleRecord[], error: null };
 }
 
 /**
- * Check if a school has at least one active admin.
- * Used to prevent orphaning a school.
+ * Onboard (activate) a staff member — sets `is_active = true` and clears
+ * any archived flag.
  */
+export async function onboardStaff(
+  schoolId: string,
+  schoolUserId: string,
+  performedBy: string,
+  notes?: string,
+): Promise<ServiceResult<StaffLifecycleRecord>> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('school_users')
+    .update({
+      is_active: true,
+      metadata: { onboarding_notes: notes },
+    })
+    .eq('id', schoolUserId)
+    .eq('school_id', schoolId)
+    .select('*')
+    .single();
+  if (error) return { data: null, error: error.message };
+  await logAuditEvent({
+    schoolId,
+    userId: performedBy,
+    action: 'user.activated',
+    resourceType: 'school_user',
+    resourceId: schoolUserId,
+    details: { notes },
+    severity: 'info',
+  });
+  return { data: data as unknown as StaffLifecycleRecord, error: null };
+}
+
+/**
+ * Update a staff member's lifecycle status (suspend, retire, reinstate, etc).
+ * Sets `is_active` based on the new status.
+ */
+export async function updateStaffStatus(
+  schoolId: string,
+  schoolUserId: string,
+  update: StaffLifecycleUpdate,
+  performedBy: string,
+  reason?: string,
+): Promise<ServiceResult<StaffLifecycleRecord>> {
+  const supabase = getSupabaseClient();
+  const payload: Record<string, unknown> = { ...update };
+  if (update.employment_status && update.employment_status !== 'active') {
+    payload.is_active = false;
+  }
+  if (update.employment_status === 'active') {
+    payload.is_active = true;
+  }
+  const { data, error } = await supabase
+    .from('school_users')
+    .update(payload)
+    .eq('id', schoolUserId)
+    .eq('school_id', schoolId)
+    .select('*')
+    .single();
+  if (error) return { data: null, error: error.message };
+
+  const action =
+    update.employment_status === 'suspended'
+      ? 'user.deactivated'
+      : update.employment_status === 'active'
+        ? 'user.activated'
+        : 'user.role.changed';
+  await logAuditEvent({
+    schoolId,
+    userId: performedBy,
+    action,
+    resourceType: 'school_user',
+    resourceId: schoolUserId,
+    details: { update, reason },
+    severity: update.employment_status === 'suspended' || update.employment_status === 'terminated' ? 'warning' : 'info',
+  });
+  return { data: data as unknown as StaffLifecycleRecord, error: null };
+}
+
+/**
+ * Offboard (deactivate) a staff member — removes login access but
+ * preserves all historical data.
+ */
+export async function offboardStaff(
+  schoolId: string,
+  schoolUserId: string,
+  performedBy: string,
+  reason: string,
+  status: EmploymentStatus = 'terminated',
+): Promise<ServiceResult<StaffLifecycleRecord>> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('school_users')
+    .update({
+      is_active: false,
+      metadata: { employment_status: status, offboard_reason: reason, offboarded_at: new Date().toISOString() },
+    })
+    .eq('id', schoolUserId)
+    .eq('school_id', schoolId)
+    .select('*')
+    .single();
+  if (error) return { data: null, error: error.message };
+  await logAuditEvent({
+    schoolId,
+    userId: performedBy,
+    action: 'user.deactivated',
+    resourceType: 'school_user',
+    resourceId: schoolUserId,
+    details: { reason, status },
+    severity: 'warning',
+  });
+  return { data: data as unknown as StaffLifecycleRecord, error: null };
+}
+
+// ─── Legacy aliases (older signatures) ───────────────────────────────────────
+
+export const updateStaffLifecycle = updateStaffStatus;
+
+export const reinstateStaff = (
+  schoolId: string,
+  schoolUserId: string,
+  performedBy: string,
+) => onboardStaff(schoolId, schoolUserId, performedBy, 'Staff reinstated');
+
+export const initiateTransfer = (
+  schoolId: string,
+  schoolUserId: string,
+  performedBy: string,
+  destination?: string,
+) =>
+  updateStaffStatus(
+    schoolId,
+    schoolUserId,
+    { employment_status: 'transferred', transfer_status: destination ?? 'pending' },
+    performedBy,
+    `Transfer initiated${destination ? ` to ${destination}` : ''}`,
+  );
+
+export const retireStaff = (
+  schoolId: string,
+  schoolUserId: string,
+  performedBy: string,
+  replacementUserId?: string,
+) =>
+  updateStaffStatus(
+    schoolId,
+    schoolUserId,
+    { employment_status: 'retired', replacement_user_id: replacementUserId },
+    performedBy,
+    'Staff retired',
+  );
+
+export const suspendStaff = (
+  schoolId: string,
+  schoolUserId: string,
+  performedBy: string,
+  reason: string,
+) =>
+  updateStaffStatus(
+    schoolId,
+    schoolUserId,
+    { employment_status: 'suspended', notes: reason },
+    performedBy,
+    reason,
+  );
+
+export async function getStaffAuditLog(
+  schoolId: string,
+  schoolUserId?: string,
+): Promise<ServiceResult<any[]>> {
+  const supabase = getSupabaseClient();
+  let q = supabase
+    .from('audit_logs')
+    .select('*')
+    .eq('school_id', schoolId)
+    .in('action', ['user.activated', 'user.deactivated', 'user.role.changed'])
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (schoolUserId) q = q.eq('resource_id', schoolUserId);
+  const { data, error } = await q;
+  if (error) return { data: null, error: error.message };
+  return { data: data ?? [], error: null };
+}
+
+export const getAllStaffWithLifecycle = getStaffLifecycle;
+
 export async function getActiveAdminCount(schoolId: string): Promise<number> {
   const supabase = getSupabaseClient();
   const { count } = await supabase
     .from('school_users')
     .select('id', { count: 'exact', head: true })
     .eq('school_id', schoolId)
-    .eq('role', 'admin')
+    .in('role', ['school_owner', 'principal', 'administrator', 'ict_manager'])
     .eq('is_active', true);
-  return count || 0;
+  return count ?? 0;
 }

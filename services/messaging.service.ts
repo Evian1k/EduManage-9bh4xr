@@ -1,67 +1,95 @@
+// EduManage — Messaging service (legacy compatibility shim)
+//
+// Re-exports the messaging functions from `communication.service.ts` so
+// older screens that import from `services/messaging.service` keep working.
+
+export {
+  getConversations,
+  getMessages,
+  sendMessage,
+  markMessageRead,
+  sendBulkSMS,
+  type ConversationPreview,
+  type Message,
+} from './communication.service';
+
 import { getSupabaseClient } from '@/template';
+import { ServiceResult } from '@/lib/types';
 
-export async function sendMessage(schoolId: string, senderId: string, data: {
-  recipient_id: string;
-  subject?: string;
-  content: string;
-  parent_message_id?: string;
-}) {
-  const supabase = getSupabaseClient();
-  return supabase
-    .from('messages')
-    .insert({ ...data, sender_id: senderId, school_id: schoolId })
-    .select()
-    .single();
-}
+// ─── Legacy aliases (older signatures) ───────────────────────────────────────
 
-export async function getInbox(schoolId: string, userId: string) {
+export async function getInbox(
+  schoolId: string,
+  userId: string,
+): Promise<ServiceResult<any[]>> {
   const supabase = getSupabaseClient();
-  return supabase
+  const { data, error } = await supabase
     .from('messages')
-    .select('*, sender:sender_id(id, email, username)')
+    .select('*, sender:sender_id(id, email), recipient:recipient_id(id, email)')
     .eq('school_id', schoolId)
     .eq('recipient_id', userId)
-    .is('parent_message_id', null)
     .order('created_at', { ascending: false });
+  if (error) return { data: null, error: error.message };
+  return { data: data ?? [], error: null };
 }
 
-export async function getSent(schoolId: string, userId: string) {
+export async function getSent(
+  schoolId: string,
+  userId: string,
+): Promise<ServiceResult<any[]>> {
   const supabase = getSupabaseClient();
-  return supabase
+  const { data, error } = await supabase
     .from('messages')
-    .select('*, recipient:recipient_id(id, email, username)')
+    .select('*, sender:sender_id(id, email), recipient:recipient_id(id, email)')
     .eq('school_id', schoolId)
     .eq('sender_id', userId)
-    .is('parent_message_id', null)
     .order('created_at', { ascending: false });
+  if (error) return { data: null, error: error.message };
+  return { data: data ?? [], error: null };
 }
 
-export async function markAsRead(messageId: string) {
+export async function markAsRead(
+  schoolId: string,
+  messageId: string,
+): Promise<ServiceResult<{ updated: boolean }>> {
   const supabase = getSupabaseClient();
-  return supabase
+  const { error } = await supabase
     .from('messages')
-    .update({ is_read: true, read_at: new Date().toISOString() })
-    .eq('id', messageId);
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .eq('school_id', schoolId);
+  if (error) return { data: null, error: error.message };
+  return { data: { updated: true }, error: null };
 }
 
-export async function getUnreadCount(schoolId: string, userId: string) {
+export async function getUnreadMessageCount(
+  schoolId: string,
+  userId: string,
+): Promise<ServiceResult<number>> {
   const supabase = getSupabaseClient();
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from('messages')
-    .select('id', { count: 'exact' })
+    .select('id', { count: 'exact', head: true })
     .eq('school_id', schoolId)
     .eq('recipient_id', userId)
-    .eq('is_read', false);
-  return count || 0;
+    .is('read_at', null);
+  if (error) return { data: null, error: error.message };
+  return { data: count ?? 0, error: null };
 }
 
-export async function getSchoolUsers(schoolId: string, roles?: string[]) {
+export async function getSchoolUsers(
+  schoolId: string,
+  roles?: string[],
+): Promise<ServiceResult<any[]>> {
   const supabase = getSupabaseClient();
-  let query = supabase
+  let q = supabase
     .from('school_users')
-    .select('id, user_id, role, user_profiles(id, email, username)')
+    .select('id, user_id, role, is_active, user_profiles(id, email, full_name)')
     .eq('school_id', schoolId)
     .eq('is_active', true);
-  if (roles && roles.length > 0) query = query.in('role', roles);
-  return query;
+  if (roles && roles.length > 0) q = q.in('role', roles);
+  q = q.order('role', { ascending: true });
+  const { data, error } = await q;
+  if (error) return { data: null, error: error.message };
+  return { data: data ?? [], error: null };
 }

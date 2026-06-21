@@ -1,116 +1,95 @@
+// EduManage — Class service (legacy compatibility shim)
+//
+// Re-exports the academic-structure functions from
+// `services/school_management.service.ts` under the names that older
+// screens still import (`getClasses`, `createClass`, `getStreams`,
+// `createStream`, `getSubjects`, `createSubject`).
+
 import { getSupabaseClient } from '@/template';
+import { ServiceResult } from '@/lib/types';
+import {
+  getClasses as mgmtGetClasses,
+  createClass as mgmtCreateClass,
+  getStreams as mgmtGetStreams,
+  createStream as mgmtCreateStream,
+  getSubjects as mgmtGetSubjects,
+  createSubject as mgmtCreateSubject,
+  SchoolClass,
+  Stream,
+  Subject,
+} from './school_management.service';
 
-export async function getClasses(schoolId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('classes')
-    .select('*, school_users!class_teacher_id(user_id, user_profiles!user_id(username))')
-    .eq('school_id', schoolId)
-    .order('grade_level')
-    .order('name');
-  return { data, error };
-}
+export interface { SchoolClass, Stream, Subject };
 
-export async function getClassById(classId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('classes')
-    .select('*, school_users!class_teacher_id(user_id, user_profiles!user_id(username))')
-    .eq('id', classId)
-    .single();
-  return { data, error };
-}
+export const getClasses = mgmtGetClasses;
 
-export async function createClass(
+export function createClass(
   schoolId: string,
   name: string,
-  gradeLevel: string,
-  section: string,
-  academicYear: string,
-  capacity: number,
-  roomNumber?: string
-) {
+  level?: string,
+  academicYearId?: string,
+  capacity?: number,
+  classTeacherId?: string,
+): Promise<ServiceResult<SchoolClass>> {
+  return mgmtCreateClass(schoolId, {
+    name,
+    level,
+    academic_year_id: academicYearId,
+    capacity,
+    class_teacher_id: classTeacherId,
+  });
+}
+
+export const getStreams = mgmtGetStreams;
+export const createStream = mgmtCreateStream;
+export const getSubjects = mgmtGetSubjects;
+export const createSubject = mgmtCreateSubject;
+
+// ─── Extra helpers (not in school_management.service) ────────────────────────
+
+export async function getClassById(
+  schoolId: string,
+  classId: string,
+): Promise<ServiceResult<SchoolClass>> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('classes')
-    .insert({ school_id: schoolId, name, grade_level: gradeLevel, section, academic_year: academicYear, capacity, room_number: roomNumber })
-    .select()
-    .single();
-  return { data, error };
+    .select('*')
+    .eq('id', classId)
+    .eq('school_id', schoolId)
+    .maybeSingle();
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: 'Class not found' };
+  return { data: data as unknown as SchoolClass, error: null };
 }
 
-export async function updateClass(classId: string, updates: Record<string, unknown>) {
+export async function updateClass(
+  schoolId: string,
+  classId: string,
+  updates: Partial<SchoolClass>,
+): Promise<ServiceResult<SchoolClass>> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('classes')
     .update(updates)
     .eq('id', classId)
-    .select()
-    .single();
-  return { data, error };
-}
-
-export async function deleteClass(classId: string) {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from('classes').delete().eq('id', classId);
-  return { error };
-}
-
-export async function getSubjects(schoolId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('subjects')
-    .select('*')
     .eq('school_id', schoolId)
-    .order('name');
-  return { data, error };
-}
-
-export async function createSubject(schoolId: string, name: string, code: string, description?: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('subjects')
-    .insert({ school_id: schoolId, name, code, description })
-    .select()
+    .select('*')
     .single();
-  return { data, error };
+  if (error) return { data: null, error: error.message };
+  return { data: data as unknown as SchoolClass, error: null };
 }
 
-export async function getClassSubjects(classId: string) {
+export async function deleteClass(
+  schoolId: string,
+  classId: string,
+): Promise<ServiceResult<{ deleted: boolean }>> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('class_subjects')
-    .select('*, subjects(name, code), school_users!teacher_id(user_id, user_profiles!user_id(username))')
-    .eq('class_id', classId);
-  return { data, error };
-}
-
-export async function assignSubjectToClass(classId: string, subjectId: string, teacherId: string | null, schoolId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('class_subjects')
-    .upsert({ class_id: classId, subject_id: subjectId, teacher_id: teacherId, school_id: schoolId })
-    .select()
-    .single();
-  return { data, error };
-}
-
-export async function getTeacherClasses(teacherSchoolUserId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('class_subjects')
-    .select('*, classes(id, name, grade_level, section, academic_year), subjects(name, code)')
-    .eq('teacher_id', teacherSchoolUserId);
-  return { data, error };
-}
-
-export async function getTimetable(classId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('timetable_slots')
-    .select('*, subjects(name), school_users!teacher_id(user_id, user_profiles!user_id(username))')
-    .eq('class_id', classId)
-    .order('day_of_week')
-    .order('start_time');
-  return { data, error };
+  const { error } = await supabase
+    .from('classes')
+    .delete()
+    .eq('id', classId)
+    .eq('school_id', schoolId);
+  if (error) return { data: null, error: error.message };
+  return { data: { deleted: true }, error: null };
 }

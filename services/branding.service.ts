@@ -1,38 +1,156 @@
+// EduManage — School branding service
+//
+// Thin wrapper around the `schools` table's branding columns. The new
+// schema uses `primary_color`, `accent_color`, and `settings.theme` rather
+// than the legacy `secondary_color`/`theme_preference`/`website_*` columns.
+// This service bridges both shapes so older screens keep working.
+
 import { getSupabaseClient } from '@/template';
+import { ServiceResult } from '@/lib/types';
+import { logAuditEvent } from './audit.service';
 
 export interface SchoolBranding {
-  primary_color: string;
-  secondary_color: string;
-  theme_preference: 'dark' | 'light';
-  logo_url?: string;
-  motto?: string;
-  website_enabled: boolean;
-  website_plan: string;
+  primary_color?: string | null;
+  accent_color?: string | null;
+  logo_url?: string | null;
+  motto?: string | null;
+  website?: string | null;
+  /** Stored in `settings.theme` (or `settings.theme_preference` for back-compat). */
+  theme_preference?: 'dark' | 'light';
+  /** Stored in `settings.website_enabled`. */
+  website_enabled?: boolean;
+  /** Stored in `settings.website_plan`. */
+  website_plan?: string;
 }
 
-/**
- * Get branding settings for a school.
- */
-export async function getSchoolBranding(schoolId: string) {
-  const supabase = getSupabaseClient();
-  return supabase
-    .from('schools')
-    .select('primary_color, secondary_color, theme_preference, logo_url, motto, website_enabled, website_plan, name, subdomain')
-    .eq('id', schoolId)
-    .single();
+export interface BrandingWithSchool extends SchoolBranding {
+  name: string;
+  subdomain: string;
 }
 
-/**
- * Update school branding settings.
- */
-export async function updateSchoolBranding(schoolId: string, branding: Partial<SchoolBranding>) {
+export async function getBranding(
+  schoolId: string,
+): Promise<ServiceResult<BrandingWithSchool>> {
+  return getSchoolBranding(schoolId);
+}
+
+export async function getSchoolBranding(
+  schoolId: string,
+): Promise<ServiceResult<BrandingWithSchool>> {
   const supabase = getSupabaseClient();
-  return supabase
+  const { data, error } = await supabase
     .from('schools')
-    .update({ ...branding, updated_at: new Date().toISOString() })
+    .select('name, subdomain, primary_color, accent_color, logo_url, motto, website, settings')
     .eq('id', schoolId)
-    .select()
+    .maybeSingle();
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: 'School not found' };
+  const row = data as {
+    name: string;
+    subdomain: string;
+    primary_color?: string | null;
+    accent_color?: string | null;
+    logo_url?: string | null;
+    motto?: string | null;
+    website?: string | null;
+    settings?: Record<string, unknown> | null;
+  };
+  const settings = (row.settings ?? {}) as Record<string, unknown>;
+  return {
+    data: {
+      name: row.name,
+      subdomain: row.subdomain,
+      primary_color: row.primary_color,
+      accent_color: row.accent_color,
+      logo_url: row.logo_url,
+      motto: row.motto,
+      website: row.website,
+      theme_preference: (settings.theme as 'dark' | 'light') ?? (settings.theme_preference as 'dark' | 'light'),
+      website_enabled: settings.website_enabled as boolean | undefined,
+      website_plan: settings.website_plan as string | undefined,
+    },
+    error: null,
+  };
+}
+
+export async function updateBranding(
+  schoolId: string,
+  branding: Partial<SchoolBranding>,
+): Promise<ServiceResult<BrandingWithSchool>> {
+  return updateSchoolBranding(schoolId, branding);
+}
+
+export async function updateSchoolBranding(
+  schoolId: string,
+  branding: Partial<SchoolBranding>,
+): Promise<ServiceResult<BrandingWithSchool>> {
+  const supabase = getSupabaseClient();
+  // Split columns vs settings
+  const columnUpdates: Record<string, unknown> = {};
+  const settingsUpdates: Record<string, unknown> = {};
+  if (branding.primary_color !== undefined) columnUpdates.primary_color = branding.primary_color;
+  if (branding.accent_color !== undefined) columnUpdates.accent_color = branding.accent_color;
+  if (branding.logo_url !== undefined) columnUpdates.logo_url = branding.logo_url;
+  if (branding.motto !== undefined) columnUpdates.motto = branding.motto;
+  if (branding.website !== undefined) columnUpdates.website = branding.website;
+  if (branding.theme_preference !== undefined) settingsUpdates.theme = branding.theme_preference;
+  if (branding.website_enabled !== undefined) settingsUpdates.website_enabled = branding.website_enabled;
+  if (branding.website_plan !== undefined) settingsUpdates.website_plan = branding.website_plan;
+
+  // Merge settings into the existing JSONB
+  if (Object.keys(settingsUpdates).length > 0) {
+    const { data: existing } = await supabase
+      .from('schools')
+      .select('settings')
+      .eq('id', schoolId)
+      .maybeSingle();
+    const current = ((existing as { settings?: Record<string, unknown> | null })?.settings) ?? {};
+    columnUpdates.settings = { ...current, ...settingsUpdates };
+  }
+
+  const { data, error } = await supabase
+    .from('schools')
+    .update(columnUpdates)
+    .eq('id', schoolId)
+    .select('name, subdomain, primary_color, accent_color, logo_url, motto, website, settings')
     .single();
+  if (error) return { data: null, error: error.message };
+
+  await logAuditEvent({
+    schoolId,
+    action: 'settings.updated',
+    resourceType: 'school',
+    resourceId: schoolId,
+    details: { updated: Object.keys(branding) },
+    severity: 'info',
+  });
+
+  const row = data as {
+    name: string;
+    subdomain: string;
+    primary_color?: string | null;
+    accent_color?: string | null;
+    logo_url?: string | null;
+    motto?: string | null;
+    website?: string | null;
+    settings?: Record<string, unknown> | null;
+  };
+  const settings = (row.settings ?? {}) as Record<string, unknown>;
+  return {
+    data: {
+      name: row.name,
+      subdomain: row.subdomain,
+      primary_color: row.primary_color,
+      accent_color: row.accent_color,
+      logo_url: row.logo_url,
+      motto: row.motto,
+      website: row.website,
+      theme_preference: (settings.theme as 'dark' | 'light') ?? undefined,
+      website_enabled: settings.website_enabled as boolean | undefined,
+      website_plan: settings.website_plan as string | undefined,
+    },
+    error: null,
+  };
 }
 
 /**
@@ -42,40 +160,29 @@ export async function updateSchoolBranding(schoolId: string, branding: Partial<S
 export async function uploadSchoolLogo(
   schoolId: string,
   base64Data: string,
-  mimeType: string = 'image/png'
-): Promise<{ url: string | null; error: any }> {
+  mimeType: string = 'image/png',
+): Promise<ServiceResult<{ url: string }>> {
   const supabase = getSupabaseClient();
-
-  // Convert base64 to ArrayBuffer
   const binary = atob(base64Data);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
-  const filePath = `school-logos/${schoolId}/logo.${ext}`;
+  const filePath = `${schoolId}/logo.${ext}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from('school-assets')
-    .upload(filePath, bytes.buffer, {
+  const { error: uploadErr } = await supabase.storage
+    .from('school-logos')
+    .upload(filePath, bytes.buffer as ArrayBuffer, {
       contentType: mimeType,
       upsert: true,
     });
+  if (uploadErr) return { data: null, error: uploadErr.message };
 
-  if (uploadError) return { url: null, error: uploadError };
-
-  const { data: urlData } = supabase.storage
-    .from('school-assets')
-    .getPublicUrl(filePath);
-
-  // Update school record with new logo URL
+  const { data: urlData } = supabase.storage.from('school-logos').getPublicUrl(filePath);
   await supabase
     .from('schools')
-    .update({ logo_url: urlData.publicUrl, updated_at: new Date().toISOString() })
+    .update({ logo_url: urlData.publicUrl })
     .eq('id', schoolId);
-
-  return { url: urlData.publicUrl, error: null };
+  return { data: { url: urlData.publicUrl }, error: null };
 }
 
 // Preset branding color palettes
