@@ -14,11 +14,20 @@ import { signInWithLockout } from '@/services/auth.security.service';
 // Dev-only demo accounts — accessible by long-pressing the logo 3 times.
 // ONLY available in development mode (__DEV__ = true).
 // In production builds, this array is empty and the feature is disabled.
+// Requires migration 7 (demo_accounts) to be applied via: supabase db push
 const DEV_DEMO_ACCOUNTS = __DEV__ ? [
   { label: 'Platform Owner', email: 'owner@edumanage.demo', password: 'Demo123!', icon: 'admin-panel-settings' as const, color: Colors.superAdmin },
-  { label: 'School Admin', email: 'admin@greenfield.demo', password: 'Demo123!', icon: 'business' as const, color: Colors.schoolAdmin },
+  { label: 'Principal', email: 'principal@greenfield.demo', password: 'Demo123!', icon: 'supervisor-account' as const, color: Colors.schoolAdmin },
+  { label: 'School Owner', email: 'admin@greenfield.demo', password: 'Demo123!', icon: 'business' as const, color: Colors.schoolAdmin },
   { label: 'Teacher', email: 'teacher@greenfield.demo', password: 'Demo123!', icon: 'cast-for-education' as const, color: Colors.teacher },
   { label: 'Student', email: 'student@greenfield.demo', password: 'Demo123!', icon: 'school' as const, color: Colors.student },
+  { label: 'Parent', email: 'parent@greenfield.demo', password: 'Demo123!', icon: 'family-restroom' as const, color: '#00897B' },
+  { label: 'Secretary', email: 'secretary@greenfield.demo', password: 'Demo123!', icon: 'desk' as const, color: '#00897B' },
+  { label: 'Bursar', email: 'bursar@greenfield.demo', password: 'Demo123!', icon: 'account-balance-wallet' as const, color: '#43A047' },
+  { label: 'ICT Manager', email: 'ict@greenfield.demo', password: 'Demo123!', icon: 'computer' as const, color: '#7B1FA2' },
+  { label: 'Librarian', email: 'librarian@greenfield.demo', password: 'Demo123!', icon: 'local-library' as const, color: '#E65100' },
+  { label: 'Nurse', email: 'nurse@greenfield.demo', password: 'Demo123!', icon: 'local-hospital' as const, color: '#D32F2F' },
+  { label: 'Company CEO', email: 'company@edumanage.demo', password: 'Demo123!', icon: 'analytics' as const, color: Colors.superAdmin },
 ] : [];
 
 function getLoginErrorMessage(errorMessage: string): string {
