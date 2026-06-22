@@ -23,6 +23,7 @@ export default function AdminLayout() {
         <Stack.Screen name="leave" />
         <Stack.Screen name="transport" />
         <Stack.Screen name="boarding" />
+        <Stack.Screen name="support" />
       </Stack>
     </RequireRole>
   );
