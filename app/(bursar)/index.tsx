@@ -118,7 +118,7 @@ export default function BursarDashboard() {
               </View>
               <View style={s.payInfo}>
                 <Text style={s.payName}>
-                  {p.students ? `${p.students.full_name} ${p.}` : 'Unknown'}
+                  {p.students ? `${p.students.full_name}` : 'Unknown'}
                 </Text>
                 <Text style={s.payFee}>{p.fee_structures?.name || 'General Payment'}</Text>
                 <Text style={s.payDate}>

@@ -224,7 +224,7 @@ export default function NurseDashboard() {
               </View>
               <View style={s.visitInfo}>
                 <Text style={s.visitName}>
-                  {v.students ? `${v.students.full_name} ${v.}` : 'Unknown'}
+                  {v.students ? `${v.students.full_name}` : 'Unknown'}
                 </Text>
                 <Text style={s.visitReason}>{v.reason}</Text>
                 {v.treatment ? <Text style={s.visitTreatment}>Rx: {v.treatment}</Text> : null}
