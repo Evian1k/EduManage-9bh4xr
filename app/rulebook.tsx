@@ -137,7 +137,7 @@ export default function RulebookScreen() {
     }, { onConflict: 'school_id,accepted_by_user_id,rulebook_version' });
     setSaving(false);
     if (error) {
-      showAlert('Error', error.message);
+      showAlert('Error', error);
       return;
     }
     await refreshContext();

@@ -49,7 +49,7 @@ export default function AnnouncementsScreen() {
     const { error } = await createPlatformAnnouncement(title.trim(), content.trim(), user.id);
     setCreating(false);
     if (error) {
-      showAlert('Error', error.message);
+      showAlert('Error', error);
       return;
     }
     setTitle('');

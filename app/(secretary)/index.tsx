@@ -70,7 +70,7 @@ export default function SecretaryDashboard() {
       recorded_by: schoolUser?.id,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setVisitorName(''); setVisitorPhone(''); setVisitorPurpose(''); setVisitorHost('');
     setShowNewVisitor(false);
     showAlert('Success', 'Visitor logged successfully');

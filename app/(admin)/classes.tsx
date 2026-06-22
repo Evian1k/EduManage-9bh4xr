@@ -54,7 +54,7 @@ export default function ClassesScreen() {
     setSaving(true);
     const { error } = await createClass(school.id, classForm.name, classForm.grade_level, classForm.section, classForm.academic_year, parseInt(classForm.capacity) || 30, classForm.room_number || undefined);
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowClassModal(false);
     setClassForm({ name: '', grade_level: '', section: 'A', academic_year: '2025/2026', capacity: '30', room_number: '' });
     load();
@@ -69,7 +69,7 @@ export default function ClassesScreen() {
     setSaving(true);
     const { error } = await createSubject(school.id, subjectForm.name, subjectForm.code, subjectForm.description || undefined);
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowSubjectModal(false);
     setSubjectForm({ name: '', code: '', description: '' });
     load();

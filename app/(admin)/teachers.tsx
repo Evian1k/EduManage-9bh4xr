@@ -130,7 +130,7 @@ export default function TeachersScreen() {
 
     setSaving(false);
     if (result.error) {
-      showAlert('Error', result.error.message);
+      showAlert('Error', result.error);
       return;
     }
     setSelected(null);
@@ -146,7 +146,7 @@ export default function TeachersScreen() {
     setSaving(true);
     const { error } = await updateStaffRole(selected.id, role);
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setSelected(null);
     load();
   };

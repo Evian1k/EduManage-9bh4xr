@@ -139,7 +139,7 @@ export default function ProfileScreen() {
       .eq('id', profileId)
       .maybeSingle();
     if (error) {
-      showAlert('Error', `Could not load profile: ${error.message}`);
+      showAlert('Error', `Could not load profile: ${error}`);
     } else if (data) {
       setProfile(data as ProfileRow);
     }
@@ -157,7 +157,7 @@ export default function ProfileScreen() {
       .order('last_seen_at', { ascending: false, nullsFirst: false });
     setDevicesLoading(false);
     if (error) {
-      showAlert('Devices', `Could not load devices: ${error.message}`);
+      showAlert('Devices', `Could not load devices: ${error}`);
       return;
     }
     setDevices((data ?? []) as unknown as UserDevice[]);
@@ -332,7 +332,7 @@ export default function ProfileScreen() {
             const supabase = getSupabaseClient();
             const { error } = await supabase.from('user_devices').delete().eq('id', device.id);
             if (error) {
-              showAlert('Error', error.message);
+              showAlert('Error', error);
               return;
             }
             setDevices((prev) => prev.filter((d) => d.id !== device.id));

@@ -58,7 +58,7 @@ export default function SchoolsScreen() {
     if (!selectedSchool) return;
     const { error } = await updateSchoolPlan(selectedSchool.id, plan);
     if (error) {
-      showAlert('Error', error.message);
+      showAlert('Error', error);
       return;
     }
     setSchools((prev) => prev.map((s) => s.id === selectedSchool.id ? { ...s, plan } : s));
@@ -71,7 +71,7 @@ export default function SchoolsScreen() {
     const newStatus = !selectedSchool.is_active;
     const { error } = await toggleSchoolStatus(selectedSchool.id, newStatus);
     if (error) {
-      showAlert('Error', error.message);
+      showAlert('Error', error);
       return;
     }
     setSchools((prev) => prev.map((s) => s.id === selectedSchool.id ? { ...s, is_active: newStatus } : s));

@@ -31,7 +31,7 @@ export default function WebsiteSectionPage() {
     if (!school) return;
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from(TABLE_NAME).select("*").eq("school_id", school.id).order("created_at", { ascending: false });
-    if (error) { console.warn("Load error:", error.message); }
+    if (error) { console.warn("Load error:", error); }
     setItems(Array.isArray(data) ? data : (data ? [data] : []));
     setLoading(false);
   }, [school]);
@@ -43,7 +43,7 @@ export default function WebsiteSectionPage() {
     if (!school) return;
     const supabase = getSupabaseClient();
     const { error } = await supabase.from(TABLE_NAME).insert({ school_id: school.id, ...form });
-    if (error) { showAlert("Error", error.message); return; }
+    if (error) { showAlert("Error", error); return; }
     setShowForm(false);
     setForm({});
     load();

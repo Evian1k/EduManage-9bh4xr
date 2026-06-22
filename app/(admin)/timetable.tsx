@@ -91,7 +91,7 @@ export default function TimetableScreen() {
       room_number: newSlot.room_number || undefined,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowAdd(false);
     setNewSlot({ subject_id: '', teacher_id: '', start_time: '08:00', end_time: '09:00', room_number: '' });
     const res = await getTimetableForClass(school!.id, selectedClass.id);

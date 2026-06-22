@@ -62,7 +62,7 @@ export default function SettingsScreen() {
       await updateSchoolBranding(school.id, { motto });
     }
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     await refreshContext();
     showAlert('Saved', 'School settings updated successfully.');
   };
@@ -75,7 +75,7 @@ export default function SettingsScreen() {
       secondary_color: palette.secondary,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setPrimaryColor(palette.primary);
     setSecondaryColor(palette.secondary);
     await refreshContext();
@@ -94,7 +94,7 @@ export default function SettingsScreen() {
     setSendingTicket(true);
     const { error } = await createTicket(school.id, user.id, ticketTitle.trim(), ticketDesc.trim(), ticketCategory, 'medium');
     setSendingTicket(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setTicketTitle('');
     setTicketDesc('');
     showAlert('Ticket Submitted', 'Your support request has been sent to EduManage support.');

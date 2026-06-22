@@ -50,7 +50,7 @@ export default function SupportScreen() {
     if (!reply.trim() || !user || !selected) return;
     setSending(true);
     const { error } = await replyToTicket(selected.id, user.id, reply.trim());
-    if (error) { showAlert('Error', error.message); setSending(false); return; }
+    if (error) { showAlert('Error', error); setSending(false); return; }
     await updateTicketStatus(selected.id, 'in_progress', user.id);
     setReply('');
     setSending(false);

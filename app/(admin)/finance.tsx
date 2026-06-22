@@ -73,7 +73,7 @@ export default function FinanceScreen() {
       recorded_by: schoolUser?.id,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowPaymentModal(false);
     setNewPayment({ student_id: '', fee_structure_id: '', amount_due: '', amount_paid: '', payment_method: 'cash', reference: '' });
     showAlert('Success', 'Payment recorded successfully');
@@ -94,7 +94,7 @@ export default function FinanceScreen() {
       is_mandatory: true,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowFeeModal(false);
     setNewFee({ name: '', amount: '', term: 'Term 1', description: '' });
     showAlert('Success', 'Fee structure created');

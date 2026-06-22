@@ -85,7 +85,7 @@ export default function StudentsScreen() {
     setSaving(true);
     if (editStudent) {
       const { error } = await updateStudent(editStudent.id, form);
-      if (error) { showAlert('Error', error.message); setSaving(false); return; }
+      if (error) { showAlert('Error', error); setSaving(false); return; }
     } else {
       if (students.length >= school.max_students) {
         showAlert('Limit Reached', `Your plan allows max ${school.max_students} students. Please upgrade.`);
@@ -93,7 +93,7 @@ export default function StudentsScreen() {
         return;
       }
       const { error } = await createStudent(school.id, form);
-      if (error) { showAlert('Error', error.message); setSaving(false); return; }
+      if (error) { showAlert('Error', error); setSaving(false); return; }
     }
     setSaving(false);
     setShowAdd(false);
