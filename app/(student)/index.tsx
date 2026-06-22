@@ -78,11 +78,11 @@ export default function StudentHome() {
         <View style={styles.profileCard}>
           <View style={styles.profileAvatar}>
             <Text style={styles.profileInitials}>
-              {(studentProfile?.full_name?.[0] || '') + (?.[0] || '')}
+              {(studentProfile?.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '')}
             </Text>
           </View>
           <View>
-            <Text style={styles.profileName}>{studentProfile?.full_name} {}</Text>
+            <Text style={styles.profileName}>{studentProfile?.full_name || 'Student'}</Text>
             <Text style={styles.profileId}>{studentProfile?.admission_number}</Text>
             <Text style={styles.profileSchool}>{school?.name}</Text>
           </View>
