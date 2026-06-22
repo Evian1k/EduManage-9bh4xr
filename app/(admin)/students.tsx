@@ -77,8 +77,8 @@ export default function StudentsScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.full_name.trim() || !.trim()) {
-      showAlert('Missing Fields', 'First name and last name are required.');
+    if (!form.full_name.trim()) {
+      showAlert('Missing Fields', 'Full name is required.');
       return;
     }
     if (!school) return;
