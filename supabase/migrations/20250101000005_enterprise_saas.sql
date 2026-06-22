@@ -68,17 +68,8 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- ----------------------------------------------------------------------------
--- 2. Expand subscription_plan enum with new tiers
+-- 2. New subscription plan tiers (enum values added in migration 20250101000004b)
 -- ----------------------------------------------------------------------------
-do $$ begin
-  alter type public.subscription_plan add value if not exists 'government';
-exception when duplicate_object then null; end $$;
-do $$ begin
-  alter type public.subscription_plan add value if not exists 'university';
-exception when duplicate_object then null; end $$;
-do $$ begin
-  alter type public.subscription_plan add value if not exists 'custom';
-exception when duplicate_object then null; end $$;
 
 -- Insert new plans
 insert into public.subscription_plans (tier, name, description, price_monthly_usd, price_yearly_usd, max_students, max_staff, max_storage_mb, ai_usage_limit, features) values
