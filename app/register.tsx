@@ -1,291 +1,196 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  ScrollView, Pressable
+  ScrollView, Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth, useAlert } from '@/template';
-import { registerSchool } from '@/services/school.service';
+import { useAlert } from '@/template';
+import { registerSchool } from '@/services/registration.service';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 
-type Step = 'school' | 'otp' | 'done';
-
-function getRLSErrorMessage(raw: string): string {
-  if (raw.includes('row-level security')) {
-    return 'Permission denied. Please try logging out and signing in again before registering.';
-  }
-  if (raw.includes('duplicate') || raw.includes('unique')) {
-    if (raw.includes('subdomain')) return 'This school ID is already taken. Please choose a different one.';
-    if (raw.includes('email')) return 'An account with this email already exists.';
-    return 'This school already exists. Please use a different name or ID.';
-  }
-  if (raw.includes('foreign key') || raw.includes('violates')) {
-    return 'Account setup issue. Please sign out, sign back in, and try again.';
-  }
-  if (raw.includes('network') || raw.includes('fetch')) {
-    return 'Network error. Please check your connection and try again.';
-  }
-  return raw;
-}
+type Step = 'form' | 'done';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { sendOTP, verifyOTPAndLogin, operationLoading } = useAuth();
   const { showAlert } = useAlert();
-
-  const [step, setStep] = useState<Step>('school');
-  const [schoolName, setSchoolName] = useState('');
-  const [subdomain, setSubdomain] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<Step>('form');
   const [loading, setLoading] = useState(false);
 
-  const handleSendOTP = async () => {
-    if (!schoolName.trim() || !subdomain.trim() || !adminEmail.trim()) {
-      showAlert('Missing Fields', 'Please fill in all school details.');
-      return;
-    }
-    if (password.length < 6) {
-      showAlert('Weak Password', 'Password must be at least 6 characters.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      showAlert('Password Mismatch', 'Passwords do not match.');
-      return;
-    }
-    const sub = subdomain.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (sub.length < 3) {
-      showAlert('Invalid School ID', 'School ID must be at least 3 characters (letters and numbers only).');
-      return;
-    }
+  const [schoolName, setSchoolName] = useState('');
+  const [subdomain, setSubdomain] = useState('');
+  const [motto, setMotto] = useState('');
+  const [country, setCountry] = useState('');
+  const [city, setCity] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const [ownerFullName, setOwnerFullName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const handleSubmit = async () => {
+    // Validate
+    if (!schoolName.trim()) return showAlert('Missing Field', 'Please enter your school name.');
+    if (!subdomain.trim()) return showAlert('Missing Field', 'Please choose a subdomain.');
+    if (!/^[a-z0-9-]+$/.test(subdomain.trim().toLowerCase()))
+      return showAlert('Invalid Subdomain', 'Subdomain can only contain lowercase letters, numbers, and hyphens.');
+    if (subdomain.trim().length < 3)
+      return showAlert('Subdomain Too Short', 'Subdomain must be at least 3 characters.');
+    if (!ownerFullName.trim()) return showAlert('Missing Field', 'Please enter your full name.');
+    if (!ownerEmail.trim()) return showAlert('Missing Field', 'Please enter your email.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail.trim()))
+      return showAlert('Invalid Email', 'Please enter a valid email address.');
+    if (password.length < 8)
+      return showAlert('Weak Password', 'Password must be at least 8 characters.');
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password))
+      return showAlert('Weak Password', 'Password must include uppercase, lowercase, and a number.');
+    if (password !== confirmPassword)
+      return showAlert('Passwords Do Not Match', 'Please re-enter your password.');
 
     setLoading(true);
-    const { error } = await sendOTP(adminEmail.trim());
-    setLoading(false);
-
-    if (error) {
-      showAlert('OTP Error', error.includes('already registered') ? 'This email is already registered. Please sign in instead.' : error);
-      return;
-    }
-    setStep('otp');
-  };
-
-  const handleVerifyAndRegister = async () => {
-    if (!otp.trim()) {
-      showAlert('OTP Required', 'Please enter the verification code sent to your email.');
-      return;
-    }
-    if (otp.length !== 4) {
-      showAlert('Invalid OTP', 'Please enter the complete 4-digit verification code.');
-      return;
-    }
-
-    setLoading(true);
-    const { error: authError, user } = await verifyOTPAndLogin(adminEmail.trim(), otp, { password });
-
-    if (authError || !user) {
+    try {
+      const result = await registerSchool({
+        schoolName: schoolName.trim(),
+        subdomain: subdomain.trim().toLowerCase(),
+        ownerEmail: ownerEmail.trim(),
+        ownerPassword: password,
+        ownerFullName: ownerFullName.trim(),
+        ownerPhone: ownerPhone.trim() || undefined,
+        country: country.trim() || undefined,
+        city: city.trim() || undefined,
+        phone: phone.trim() || undefined,
+        motto: motto.trim() || undefined,
+      });
+      if (result.error) {
+        showAlert('Registration Failed', result.error);
+        return;
+      }
+      setStep('done');
+    } catch (e: any) {
+      showAlert('Error', e?.message ?? 'Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-      showAlert('Verification Failed', authError === 'Token has expired or is invalid' ? 'Your code has expired. Please go back and request a new one.' : authError || 'Could not verify the code. Please try again.');
-      return;
     }
-
-    // Register school with the authenticated user
-    const { error: schoolError } = await registerSchool(
-      schoolName.trim(),
-      subdomain.trim(),
-      adminEmail.trim(),
-      user.id
-    );
-    setLoading(false);
-
-    if (schoolError) {
-      const friendlyMsg = getRLSErrorMessage(schoolError.message || String(schoolError));
-      showAlert('Registration Error', friendlyMsg);
-      return;
-    }
-
-    setStep('done');
   };
 
   if (step === 'done') {
     return (
-      <View style={styles.successContainer}>
-        <View style={styles.successIcon}>
-          <MaterialIcons name="check-circle" size={64} color={Colors.success} />
-        </View>
-        <Text style={styles.successTitle}>School Registered!</Text>
-        <Text style={styles.successText}>
-          Welcome to EduManage! {schoolName} has been set up on the Free Trial plan (50 students, 5 teachers, 30 days).
-        </Text>
-        <View style={styles.trialBox}>
-          <MaterialIcons name="card-giftcard" size={20} color={Colors.warning} />
-          <Text style={styles.trialText}>Your 30-day free trial has started. Upgrade anytime from Settings.</Text>
-        </View>
-        <Button
-          label="Go to Dashboard"
-          onPress={() => router.replace('/')}
-          fullWidth
-          size="lg"
-        />
+      <View style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.doneContainer}>
+          <View style={styles.doneIcon}>
+            <MaterialIcons name="check-circle" size={64} color={Colors.success} />
+          </View>
+          <Text style={styles.doneTitle}>School Registered!</Text>
+          <Text style={styles.doneSubtitle}>
+            Welcome, {ownerFullName.split(' ')[0]}! Your school{' '}
+            <Text style={styles.schoolName}>{schoolName}</Text> has been created.
+          </Text>
+          <View style={styles.doneCard}>
+            <View style={styles.doneRow}>
+              <MaterialIcons name="language" size={18} color={Colors.primary} />
+              <View>
+                <Text style={styles.doneLabel}>Your school URL</Text>
+                <Text style={styles.doneValue}>{subdomain}.edumanage.com</Text>
+              </View>
+            </View>
+            <View style={styles.doneRow}>
+              <MaterialIcons name="mail" size={18} color={Colors.primary} />
+              <View>
+                <Text style={styles.doneLabel}>Verify your email</Text>
+                <Text style={styles.doneValue}>{ownerEmail}</Text>
+              </View>
+            </View>
+            <View style={styles.doneRow}>
+              <MaterialIcons name="card-giftcard" size={18} color={Colors.success} />
+              <View>
+                <Text style={styles.doneLabel}>Trial plan</Text>
+                <Text style={styles.doneValue}>14 days free · Starter plan</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={styles.doneHint}>
+            We sent a verification link to your email. Click it, then sign in to start inviting staff.
+          </Text>
+          <Button label="Continue to Sign In" onPress={() => router.replace('/login' as any)} fullWidth size="lg" />
+        </ScrollView>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.flex} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <MaterialIcons name="arrow-back" size={24} color={Colors.textPrimary} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Register School</Text>
-          <View style={{ width: 24 }} />
-        </View>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
+          <MaterialIcons name="arrow-back" size={22} color={Colors.textPrimary} />
+        </Pressable>
 
-        {/* Progress */}
-        <View style={styles.progressRow}>
-          {(['school', 'otp'] as Step[]).map((s, i) => (
-            <React.Fragment key={s}>
-              <View style={[
-                styles.progressDot,
-                step === s && styles.progressDotActive,
-                (step === 'otp' && i === 0) && styles.progressDotDone,
-              ]}>
-                {(step === 'otp' && i === 0)
-                  ? <MaterialIcons name="check" size={16} color={Colors.success} />
-                  : <Text style={styles.progressDotText}>{i + 1}</Text>
-                }
-              </View>
-              {i < 1 ? <View style={[styles.progressLine, step === 'otp' && styles.progressLineDone]} /> : null}
-            </React.Fragment>
-          ))}
+        <View style={styles.logoArea}>
+          <View style={styles.logo}>
+            <MaterialIcons name="school" size={32} color={Colors.primary} />
+          </View>
+          <Text style={styles.appName}>Register Your School</Text>
+          <Text style={styles.tagline}>Start your 14-day free trial — no credit card required</Text>
         </View>
 
         <View style={styles.card}>
-          {step === 'school' ? (
-            <>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionIconBg}>
-                  <MaterialIcons name="business" size={22} color={Colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.formTitle}>School Information</Text>
-                  <Text style={styles.formSubtitle}>Set up your school on EduManage</Text>
-                </View>
-              </View>
-              <View style={styles.fields}>
-                <Input
-                  label="School Name"
-                  value={schoolName}
-                  onChangeText={setSchoolName}
-                  leftIcon="school"
-                  placeholder="e.g. Greenfield Academy"
-                />
-                <Input
-                  label="School ID (Subdomain)"
-                  value={subdomain}
-                  onChangeText={(t) => setSubdomain(t.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                  leftIcon="link"
-                  placeholder="e.g. greenfield"
-                  hint={`Your school URL: ${subdomain || 'yourschool'}.edumanage.com`}
-                  autoCapitalize="none"
-                />
-                <Input
-                  label="Admin Email"
-                  value={adminEmail}
-                  onChangeText={setAdminEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  leftIcon="email"
-                  placeholder="principal@school.edu"
-                />
-                <Input
-                  label="Password"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  leftIcon="lock"
-                  placeholder="Min. 6 characters"
-                />
-                <Input
-                  label="Confirm Password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                  leftIcon="lock"
-                  placeholder="Re-enter password"
-                />
-              </View>
-              <Button
-                label="Continue — Verify Email"
-                onPress={handleSendOTP}
-                fullWidth
-                loading={loading || operationLoading}
-                size="lg"
-              />
-            </>
-          ) : (
-            <>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIconBg, { backgroundColor: Colors.successBg }]}>
-                  <MaterialIcons name="verified" size={22} color={Colors.success} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formTitle}>Verify Email</Text>
-                  <Text style={styles.formSubtitle} numberOfLines={2}>
-                    Enter the 4-digit code sent to{'\n'}{adminEmail}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.otpHint}>
-                <MaterialIcons name="schedule" size={14} color={Colors.textMuted} />
-                <Text style={styles.otpHintText}>Code expires in 60 minutes. Check your spam folder if not received.</Text>
-              </View>
-              <View style={styles.fields}>
-                <Input
-                  label="Verification Code"
-                  value={otp}
-                  onChangeText={setOtp}
-                  keyboardType="number-pad"
-                  leftIcon="pin"
-                  placeholder="4-digit code"
-                  maxLength={4}
-                />
-              </View>
-              <Button
-                label="Register School"
-                onPress={handleVerifyAndRegister}
-                fullWidth
-                loading={loading || operationLoading}
-                size="lg"
-              />
-              <Button
-                label="Back — Edit Details"
-                onPress={() => { setStep('school'); setOtp(''); }}
-                variant="ghost"
-                fullWidth
-                size="sm"
-              />
-            </>
-          )}
+          <Text style={styles.sectionTitle}>School Details</Text>
+          <Input label="School Name" value={schoolName} onChangeText={setSchoolName} leftIcon="business" placeholder="Greenwood Academy" />
+          <Input
+            label="Subdomain"
+            value={subdomain}
+            onChangeText={setSubdomain}
+            leftIcon="language"
+            placeholder="greenwood"
+            autoCapitalize="none"
+            hint={`${subdomain || 'your-school'}.edumanage.com`}
+          />
+          <Input label="Motto (optional)" value={motto} onChangeText={setMotto} leftIcon="format-quote" placeholder="Education for Excellence" />
+          <Input label="Country" value={country} onChangeText={setCountry} placeholder="Kenya" />
+          <Input label="City" value={city} onChangeText={setCity} placeholder="Nairobi" />
+          <Input label="School Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+254 700 000 000" />
         </View>
 
-        <View style={styles.planInfo}>
-          <MaterialIcons name="card-giftcard" size={16} color={Colors.warning} />
-          <Text style={styles.planText}>
-            Free Trial: 30 days • 50 students • 5 teachers • AI included. No credit card required.
-          </Text>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Owner Account</Text>
+          <Text style={styles.sectionSub}>You will be the school owner with full administrative access.</Text>
+          <Input label="Your Full Name" value={ownerFullName} onChangeText={setOwnerFullName} leftIcon="person" placeholder="Jane Doe" />
+          <Input label="Email Address" value={ownerEmail} onChangeText={setOwnerEmail} leftIcon="email" keyboardType="email-address" autoCapitalize="none" placeholder="jane@greenwood.edu" />
+          <Input label="Phone (optional)" value={ownerPhone} onChangeText={setOwnerPhone} leftIcon="phone" keyboardType="phone-pad" placeholder="+254 700 000 000" />
+          <Input
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            leftIcon="lock"
+            placeholder="Min 8 chars, 1 upper, 1 lower, 1 number"
+          />
+          <Input
+            label="Confirm Password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            leftIcon="lock"
+            placeholder="Re-enter password"
+          />
         </View>
+
+        <Button label="Create School & Start Trial" onPress={handleSubmit} fullWidth loading={loading} size="lg" />
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
-          <Pressable onPress={() => router.replace('/login')}>
+          <Pressable onPress={() => router.push('/login' as any)}>
             <Text style={styles.footerLink}>Sign In</Text>
           </Pressable>
         </View>
@@ -297,59 +202,35 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
   container: { flexGrow: 1, padding: Spacing.lg, paddingBottom: 60, gap: Spacing.md },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: Spacing.lg },
-  headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0 },
-  progressDot: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: Colors.border,
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xs },
+  logoArea: { alignItems: 'center', marginBottom: Spacing.md },
+  logo: {
+    width: 64, height: 64, borderRadius: 18,
+    backgroundColor: Colors.schoolAdminBg,
+    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm,
   },
-  progressDotActive: { borderColor: Colors.primary, backgroundColor: Colors.schoolAdminBg },
-  progressDotDone: { borderColor: Colors.success, backgroundColor: Colors.successBg },
-  progressDotText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.bold },
-  progressLine: { width: 48, height: 2, backgroundColor: Colors.border },
-  progressLineDone: { backgroundColor: Colors.success },
+  appName: { fontSize: 24, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  tagline: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
   card: {
-    backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: Spacing.lg,
-    borderWidth: 1, borderColor: Colors.border, gap: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.xl,
+    padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, gap: Spacing.md,
   },
-  sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
-  sectionIconBg: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: Colors.schoolAdminBg, alignItems: 'center', justifyContent: 'center',
-  },
-  formTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  formSubtitle: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  otpHint: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
-    backgroundColor: Colors.surface2, padding: Spacing.sm, borderRadius: BorderRadius.sm,
-  },
-  otpHintText: { flex: 1, fontSize: FontSize.xs, color: Colors.textMuted, lineHeight: 18 },
-  fields: { gap: Spacing.md },
-  planInfo: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs,
-    backgroundColor: Colors.warningBg, padding: Spacing.md, borderRadius: BorderRadius.md,
-    borderWidth: 1, borderColor: `${Colors.warning}30`,
-  },
-  planText: { flex: 1, fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20 },
-  footer: { flexDirection: 'row', justifyContent: 'center' },
+  sectionTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  sectionSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: -4 },
+  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.sm },
   footerText: { color: Colors.textSecondary, fontSize: FontSize.base },
   footerLink: { color: Colors.primary, fontSize: FontSize.base, fontWeight: FontWeight.semibold },
-  successContainer: {
-    flex: 1, backgroundColor: Colors.background, alignItems: 'center',
-    justifyContent: 'center', padding: Spacing.xl, gap: Spacing.lg,
+  doneContainer: { flexGrow: 1, padding: Spacing.lg, justifyContent: 'center', gap: Spacing.md },
+  doneIcon: { alignItems: 'center', marginBottom: Spacing.md },
+  doneTitle: { fontSize: 28, fontWeight: FontWeight.bold, color: Colors.textPrimary, textAlign: 'center' },
+  doneSubtitle: { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  schoolName: { color: Colors.primary, fontWeight: FontWeight.semibold },
+  doneCard: {
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
+    padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, gap: Spacing.md,
   },
-  successIcon: {
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: Colors.successBg, alignItems: 'center', justifyContent: 'center',
-  },
-  successTitle: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  successText: { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 24 },
-  trialBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm,
-    backgroundColor: Colors.warningBg, padding: Spacing.md, borderRadius: BorderRadius.md,
-    width: '100%',
-  },
-  trialText: { flex: 1, fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20 },
+  doneRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  doneLabel: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
+  doneValue: { fontSize: FontSize.base, color: Colors.textPrimary, fontWeight: FontWeight.semibold },
+  doneHint: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 });
