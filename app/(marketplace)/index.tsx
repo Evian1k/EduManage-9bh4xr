@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Header } from '@/components/layout/Header';
@@ -80,8 +80,6 @@ export default function MarketplaceIndex() {
     </SafeAreaView>
   );
 }
-
-import { ScrollView } from 'react-native';
 
 const s = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },

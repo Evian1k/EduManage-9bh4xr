@@ -36,7 +36,7 @@ export default function StudentTimetable() {
   return (
     <SafeAreaView style={s.flex} edges={['bottom']}>
       <Header title="My Timetable" subtitle={school.name} showBack accentColor={Colors.student} />
-      <View style={s.dayRow}>{DAYS.map((d, i) => (<View key={d}><Text style={[s.dayText, i === day && s.dayActive]} onPress={() => setDay(i)}>{d.slice(0, 3)}</Text>{i === day && <View style={s.dayUnderline} />}</View></View>))}</View>
+      <View style={s.dayRow}>{DAYS.map((d, i) => (<View key={d}><Text style={[s.dayText, i === day && s.dayActive]} onPress={() => setDay(i)}>{d.slice(0, 3)}</Text>{i === day && <View style={s.dayUnderline} />}</View>))}</View>
       <FlatList data={slots} keyExtractor={(item) => item.id} contentContainerStyle={s.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         renderItem={({ item }) => (
           <Card style={s.card}><View style={s.row}><View style={s.timeCol}><Text style={s.startTime}>{item.start_time?.slice(0, 5)}</Text><Text style={s.endTime}>{item.end_time?.slice(0, 5)}</Text></View><View style={s.info}><Text style={s.subject}>{item.subjects?.name || 'Unknown'}</Text>{item.teachers?.full_name && <Text style={s.teacher}>{item.teachers.full_name}</Text>}{item.room && <Text style={s.room}>Room: {item.room}</Text>}</View></View></Card>
