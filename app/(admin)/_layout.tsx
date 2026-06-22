@@ -24,6 +24,7 @@ export default function AdminLayout() {
         <Stack.Screen name="transport" />
         <Stack.Screen name="boarding" />
         <Stack.Screen name="support" />
+        <Stack.Screen name="website" />
       </Stack>
     </RequireRole>
   );
