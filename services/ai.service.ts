@@ -341,3 +341,66 @@ export async function getAIUsageStats(
     error: null,
   };
 }
+
+// ============================================================================
+// Company AI — for EduManage employees (CEO, Support, Finance, etc.)
+// These features use a separate endpoint and are billed to the company,
+// not to individual schools.
+// ============================================================================
+
+export type CompanyAIFeature =
+  | 'support_assistant'
+  | 'revenue_forecast'
+  | 'churn_prediction'
+  | 'growth_recommendations'
+  | 'operational_analytics';
+
+export async function invokeCompanyAI(
+  feature: CompanyAIFeature,
+  messages: AIMessage[],
+  opts?: { model?: string; temperature?: number; max_tokens?: number }
+): Promise<{ data: AIResponse | null; error: string | null }> {
+  const supabase = getSupabaseClient();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
+  if (!accessToken) return { data: null, error: 'Not authenticated' };
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return { data: null, error: 'Supabase URL not configured' };
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/ai-assistant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        messages,
+        feature: feature as any,
+        school_id: undefined, // Company AI is not school-scoped
+        model: opts?.model,
+        temperature: opts?.temperature,
+        max_tokens: opts?.max_tokens,
+      }),
+    });
+    if (!res.ok) { const errBody = await res.json().catch(() => ({})); return { data: null, error: errBody.error ?? `AI request failed (${res.status})` }; }
+    const data = await res.json();
+    return { data: data as AIResponse, error: null };
+  } catch (e: any) { return { data: null, error: e?.message ?? 'Network error' }; }
+}
+
+export async function supportTicketAssistant(ticketDescription: string): Promise<{ content: string | null; error: string | null }> {
+  const { data, error } = await invokeCompanyAI('support_assistant', [{ role: 'user', content: `Support ticket: ${ticketDescription}\n\nSuggest a response and resolution steps.` }]);
+  return { content: data?.content ?? null, error };
+}
+
+export async function revenueForecast(currentRevenue: number, growthRate: number): Promise<{ content: string | null; error: string | null }> {
+  const { data, error } = await invokeCompanyAI('revenue_forecast', [{ role: 'user', content: `Current MRR: $${currentRevenue}. Growth rate: ${growthRate}%/month. Forecast revenue for next 12 months and identify risks.` }]);
+  return { content: data?.content ?? null, error };
+}
+
+export async function churnPrediction(schoolData: string): Promise<{ content: string | null; error: string | null }> {
+  const { data, error } = await invokeCompanyAI('churn_prediction', [{ role: 'user', content: `Analyze this school data and predict churn risk:\n${schoolData}` }]);
+  return { content: data?.content ?? null, error };
+}
+
+export async function growthRecommendations(metrics: string): Promise<{ content: string | null; error: string | null }> {
+  const { data, error } = await invokeCompanyAI('growth_recommendations', [{ role: 'user', content: `Company metrics:\n${metrics}\n\nProvide growth recommendations.` }]);
+  return { content: data?.content ?? null, error };
+}

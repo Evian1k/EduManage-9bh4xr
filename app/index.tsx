@@ -15,6 +15,17 @@ export default function RootScreen() {
   if (!rulebookAccepted && rulebookRoles.includes(userRole)) return <Redirect href={'/rulebook' as any} />;
   switch (userRole) {
     case 'platform_admin': return <Redirect href={'/(superadmin)/' as any} />;
+    case 'company_ceo':
+    case 'company_support':
+    case 'company_engineering':
+    case 'company_security':
+    case 'company_sales':
+    case 'company_finance':
+    case 'company_hr':
+    case 'company_marketing':
+    case 'company_customer_success':
+    case 'company_maintenance':
+      return <Redirect href={'/(company)/' as any} />;
     case 'school_owner': case 'principal': case 'deputy_principal': case 'administrator': return <Redirect href={'/(admin)/' as any} />;
     case 'ict_manager': return <Redirect href={'/(ict)/' as any} />;
     case 'teacher': return <Redirect href={'/(teacher)/' as any} />;
@@ -25,6 +36,7 @@ export default function RootScreen() {
     case 'librarian': return <Redirect href={'/(librarian)/' as any} />;
     case 'nurse': return <Redirect href={'/(nurse)/' as any} />;
     case 'boarding_master': case 'boarding_mistress': return <Redirect href={'/(boarding)/' as any} />;
+    case 'company_ceo': case 'company_support': case 'company_engineering': case 'company_security': case 'company_sales': case 'company_finance': case 'company_hr': case 'company_marketing': case 'company_customer_success': case 'company_maintenance': return <Redirect href={'/(company)/' as any} />;
     default: return <Redirect href={'/(admin)/' as any} />;
   }
 }

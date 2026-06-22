@@ -37,6 +37,10 @@ export default function RootLayout() {
                   <Stack.Screen name="(librarian)" />
                   <Stack.Screen name="(nurse)" />
                   <Stack.Screen name="(boarding)" />
+                  <Stack.Screen name="(company)" />
+                  <Stack.Screen name="(marketplace)" />
+                  <Stack.Screen name="(company)" />
+                  <Stack.Screen name="(marketplace)" />
                   <Stack.Screen name="rulebook" />
                 </Stack>
               </NotificationsProvider>
