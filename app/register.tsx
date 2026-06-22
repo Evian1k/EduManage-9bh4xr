@@ -35,10 +35,11 @@ export default function RegisterScreen() {
   const handleSubmit = async () => {
     // Validate
     if (!schoolName.trim()) return showAlert('Missing Field', 'Please enter your school name.');
-    if (!subdomain.trim()) return showAlert('Missing Field', 'Please choose a subdomain.');
-    if (!/^[a-z0-9-]+$/.test(subdomain.trim().toLowerCase()))
+    // Sanitize subdomain: lowercase + strip everything except a-z, 0-9, hyphens
+    const cleanSubdomain = subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!cleanSubdomain)
       return showAlert('Invalid Subdomain', 'Subdomain can only contain lowercase letters, numbers, and hyphens.');
-    if (subdomain.trim().length < 3)
+    if (cleanSubdomain.length < 3)
       return showAlert('Subdomain Too Short', 'Subdomain must be at least 3 characters.');
     if (!ownerFullName.trim()) return showAlert('Missing Field', 'Please enter your full name.');
     if (!ownerEmail.trim()) return showAlert('Missing Field', 'Please enter your email.');
@@ -55,7 +56,7 @@ export default function RegisterScreen() {
     try {
       const result = await registerSchool({
         schoolName: schoolName.trim(),
-        subdomain: subdomain.trim().toLowerCase(),
+        subdomain: cleanSubdomain,
         ownerEmail: ownerEmail.trim(),
         ownerPassword: password,
         ownerFullName: ownerFullName.trim(),
@@ -94,7 +95,7 @@ export default function RegisterScreen() {
               <MaterialIcons name="language" size={18} color={Colors.primary} />
               <View>
                 <Text style={styles.doneLabel}>Your school URL</Text>
-                <Text style={styles.doneValue}>{subdomain}.edumanage.com</Text>
+                <Text style={styles.doneValue}>{subdomain.trim().toLowerCase()}.edumanage.com</Text>
               </View>
             </View>
             <View style={styles.doneRow}>
