@@ -67,7 +67,7 @@ export default function NurseDashboard() {
       recorded_by: schoolUser?.id,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowNewVisit(false);
     setSelectedStudent(null);
     setReason(''); setTreatment(''); setTemperature('');
@@ -79,7 +79,7 @@ export default function NurseDashboard() {
 
   const filteredStudents = students.filter(s =>
     !studentSearch ||
-    `${s.first_name} ${s.last_name}`.toLowerCase().includes(studentSearch.toLowerCase()) ||
+    `${s.full_name}`.toLowerCase().includes(studentSearch.toLowerCase()) ||
     s.admission_number?.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
@@ -143,8 +143,8 @@ export default function NurseDashboard() {
             {studentSearch && !selectedStudent ? (
               <View style={s.dropdown}>
                 {filteredStudents.slice(0, 5).map(st => (
-                  <Pressable key={st.id} style={s.dropItem} onPress={() => { setSelectedStudent(st); setStudentSearch(`${st.first_name} ${st.last_name}`); }}>
-                    <Text style={s.dropName}>{st.first_name} {st.last_name}</Text>
+                  <Pressable key={st.id} style={s.dropItem} onPress={() => { setSelectedStudent(st); setStudentSearch(`${st.full_name}`); }}>
+                    <Text style={s.dropName}>{st.full_name} {}</Text>
                     <Text style={s.dropAdm}>{st.admission_number} · {st.classes?.name}</Text>
                     {hasAllergy(st) ? <Badge label="ALLERGY" variant="error" size="sm" /> : null}
                   </Pressable>
@@ -155,7 +155,7 @@ export default function NurseDashboard() {
             {selectedStudent ? (
               <View style={s.selectedStudent}>
                 <MaterialIcons name="person" size={16} color={Colors.primary} />
-                <Text style={s.selectedName}>{selectedStudent.first_name} {selectedStudent.last_name}</Text>
+                <Text style={s.selectedName}>{selectedStudent.full_name} {}</Text>
                 {hasAllergy(selectedStudent) ? (
                   <View style={s.allergyWarn}>
                     <MaterialIcons name="warning" size={12} color={Colors.error} />
@@ -224,7 +224,7 @@ export default function NurseDashboard() {
               </View>
               <View style={s.visitInfo}>
                 <Text style={s.visitName}>
-                  {v.students ? `${v.students.first_name} ${v.students.last_name}` : 'Unknown'}
+                  {v.students ? `${v.students.full_name} ${v.}` : 'Unknown'}
                 </Text>
                 <Text style={s.visitReason}>{v.reason}</Text>
                 {v.treatment ? <Text style={s.visitTreatment}>Rx: {v.treatment}</Text> : null}

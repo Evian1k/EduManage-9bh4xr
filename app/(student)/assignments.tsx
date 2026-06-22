@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Modal, Pressable, ScrollView } from 'react-native';
 import { useAlert } from '@/template';
 import { useAppContext } from '@/hooks/useAppContext';
-import { getStudentAssignments, submitAssignment } from '@/services/student.service';
+import { getAssignments, submitAssignment } from '@/services/lms.service';
 import { BottomNav } from '@/components/layout/BottomNav';
 
 const STUDENT_NAV = [
@@ -32,21 +32,21 @@ export default function StudentAssignments() {
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
-    if (!studentProfile?.class_id) { setLoading(false); return; }
-    const { data } = await getStudentAssignments(studentProfile.class_id, studentProfile.id);
+    if (!school || !studentProfile?.class_id) { setLoading(false); return; }
+    const { data } = await getAssignments(school.id, { classId: studentProfile.class_id });
     setAssignments(data || []);
     setLoading(false);
-  }, [studentProfile]);
+  }, [school, studentProfile]);
 
-  useEffect(() => { load(); }, [studentProfile]);
+  useEffect(() => { load(); }, [load]);
 
   const handleSubmit = async () => {
     if (!submissionText.trim()) { showAlert('Required', 'Please write your submission.'); return; }
     if (!studentProfile || !school || !selected) return;
     setSubmitting(true);
-    const { error } = await submitAssignment(selected.id, studentProfile.id, school.id, submissionText.trim());
+    const { error } = await submitAssignment(school.id, { assignment_id: selected.id, student_id: studentProfile.id, submission_text: submissionText.trim() });
     setSubmitting(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     showAlert('Submitted', 'Your assignment has been submitted successfully!');
     setSelected(null);
     setSubmissionText('');

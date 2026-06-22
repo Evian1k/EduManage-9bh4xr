@@ -63,13 +63,13 @@ export default function AdminDashboard() {
     <View style={styles.flex}>
       <Header
         title={school?.name || 'School Dashboard'}
-        subtitle={`${getPlanLabel(school?.plan || 'free_trial')} Plan`}
+        subtitle={`${getPlanLabel(school?.plan_tier || 'free_trial')} Plan`}
         accentColor={Colors.primary}
         rightAction={{ icon: 'logout', onPress: handleLogout }}
       />
       <ScreenWrapper refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }}>
         {/* Plan Banner */}
-        {school?.plan === 'free_trial' ? (
+        {school?.plan_tier === 'free_trial' ? (
           <View style={styles.trialBanner}>
             <MaterialIcons name="access-time" size={20} color={Colors.warning} />
             <Text style={styles.trialText}>Free Trial: {planDaysLeft} days remaining</Text>
@@ -113,10 +113,10 @@ export default function AdminDashboard() {
               </View>
               <View style={[styles.capacityRow, { marginTop: Spacing.sm }]}>
                 <Text style={styles.capacityLabel}>Teachers</Text>
-                <Text style={styles.capacityVal}>{stats?.totalTeachers || 0} / {school.max_teachers}</Text>
+                <Text style={styles.capacityVal}>{stats?.totalTeachers || 0} / {school.max_staff}</Text>
               </View>
               <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${Math.min(100, ((stats?.totalTeachers || 0) / school.max_teachers) * 100)}%`, backgroundColor: Colors.teacher }]} />
+                <View style={[styles.progressFill, { width: `${Math.min(100, ((stats?.totalTeachers || 0) / school.max_staff) * 100)}%`, backgroundColor: Colors.teacher }]} />
               </View>
               <View style={[styles.capacityRow, { marginTop: Spacing.sm }]}>
                 <Text style={styles.capacityLabel}>AI Usage</Text>

@@ -110,7 +110,7 @@ export default function SuperAdminDashboard() {
                 <Text style={styles.schoolDate}>Joined {formatDate(school.created_at)}</Text>
               </View>
               <View style={styles.schoolRight}>
-                <Badge label={getPlanLabel(school.plan)} variant={getPlanBadgeVariant(school.plan)} size="sm" />
+                <Badge label={getPlanLabel(school.plan_tier)} variant={getPlanBadgeVariant(school.plan_tier)} size="sm" />
                 <Badge label={school.is_active ? 'Active' : 'Inactive'} variant={school.is_active ? 'success' : 'error'} size="sm" />
               </View>
             </View>

@@ -80,7 +80,7 @@ export default function AttendanceScreen() {
     setSaving(true);
     const { error } = await bulkRecordAttendance(records);
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     showAlert('Saved', `Attendance recorded for ${students.length} students.`);
   };
 
@@ -125,9 +125,9 @@ export default function AttendanceScreen() {
             renderItem={({ item }) => (
               <Card style={styles.studentCard}>
                 <View style={styles.studentRow}>
-                  <Avatar name={`${item.first_name} ${item.last_name}`} size={40} />
+                  <Avatar name={`${item.full_name}`} size={40} />
                   <View style={styles.studentInfo}>
-                    <Text style={styles.studentName}>{item.first_name} {item.last_name}</Text>
+                    <Text style={styles.studentName}>{item.full_name} {}</Text>
                     <Text style={styles.studentId}>{item.admission_number}</Text>
                   </View>
                 </View>

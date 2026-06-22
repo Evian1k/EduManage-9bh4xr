@@ -52,7 +52,7 @@ export default function ICTUsersScreen() {
       .select('id, user_id, role, is_active, created_at, user_profiles(id, email, full_name, username, email_verified, mfa_enabled)')
       .eq('school_id', schoolId)
       .order('created_at', { ascending: false });
-    if (error) showAlert('Error', error.message);
+    if (error) showAlert('Error', error);
     setUsers((data || []) as unknown as SchoolUserRow[]);
     setLoading(false);
     setRefreshing(false);

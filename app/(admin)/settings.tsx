@@ -217,7 +217,7 @@ export default function SettingsScreen() {
               <View style={styles.planHeader}>
                 <View>
                   <Text style={styles.planCurrentLabel}>Current Plan</Text>
-                  <Badge label={getPlanLabel(school?.plan || 'free_trial')} variant={getPlanBadgeVariant(school?.plan || 'free_trial')} />
+                  <Badge label={getPlanLabel(school?.plan_tier || 'free_trial')} variant={getPlanBadgeVariant(school?.plan_tier || 'free_trial')} />
                 </View>
                 <View style={[styles.planStatusBadge, { backgroundColor: school?.plan_status === 'active' ? `${Colors.success}20` : `${Colors.warning}20` }]}>
                   <Text style={[styles.planStatusText, { color: school?.plan_status === 'active' ? Colors.success : Colors.warning }]}>
@@ -225,7 +225,7 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </View>
-              {school?.plan === 'free_trial' ? (
+              {school?.plan_tier === 'free_trial' ? (
                 <View style={styles.trialBox}>
                   <MaterialIcons name="access-time" size={16} color={Colors.warning} />
                   <Text style={styles.trialText}>Trial ends {formatDate(school.trial_ends_at)}</Text>
@@ -234,7 +234,7 @@ export default function SettingsScreen() {
               <View style={styles.quotaGrid}>
                 {[
                   { label: 'Students', used: 0, max: school?.max_students || 50, icon: 'people', color: Colors.primary },
-                  { label: 'Teachers', used: 0, max: school?.max_teachers || 5, icon: 'badge', color: Colors.teacher },
+                  { label: 'Teachers', used: 0, max: school?.max_staff || 5, icon: 'badge', color: Colors.teacher },
                   { label: 'AI Calls', used: school?.ai_usage_count || 0, max: school?.ai_usage_limit || 100, icon: 'psychology', color: Colors.secondary },
                 ].map(q => (
                   <View key={q.label} style={styles.quotaCard}>

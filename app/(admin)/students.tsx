@@ -38,11 +38,11 @@ export default function StudentsScreen() {
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '',
+    full_name: '', email: '', phone: '',
     gender: 'male', class_id: '', parent_name: '', parent_phone: '', parent_email: '',
   });
 
-  const resetForm = () => setForm({ first_name: '', last_name: '', email: '', phone: '', gender: 'male', class_id: '', parent_name: '', parent_phone: '', parent_email: '' });
+  const resetForm = () => setForm({ full_name: '', email: '', phone: '', gender: 'male', class_id: '', parent_name: '', parent_phone: '', parent_email: '' });
 
   const load = useCallback(async () => {
     if (!school) return;
@@ -58,14 +58,13 @@ export default function StudentsScreen() {
 
   useEffect(() => {
     const q = search.toLowerCase();
-    setFiltered(!q ? students : students.filter((s) => `${s.first_name} ${s.last_name} ${s.admission_number}`.toLowerCase().includes(q)));
+    setFiltered(!q ? students : students.filter((s) => `${s.full_name} ${s.admission_number}`.toLowerCase().includes(q)));
   }, [search, students]);
 
   const openEdit = (student: any) => {
     setEditStudent(student);
     setForm({
-      first_name: student.first_name,
-      last_name: student.last_name,
+      full_name: student.full_name,
       email: student.email || '',
       phone: student.phone || '',
       gender: student.gender || 'male',
@@ -78,7 +77,7 @@ export default function StudentsScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.first_name.trim() || !form.last_name.trim()) {
+    if (!form.full_name.trim() || !.trim()) {
       showAlert('Missing Fields', 'First name and last name are required.');
       return;
     }
@@ -104,7 +103,7 @@ export default function StudentsScreen() {
   };
 
   const handleDelete = (student: any) => {
-    showAlert('Delete Student', `Remove ${student.first_name} ${student.last_name}?`, [
+    showAlert('Delete Student', `Remove ${student.full_name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteStudent(student.id); load(); } },
     ]);
@@ -136,9 +135,9 @@ export default function StudentsScreen() {
         renderItem={({ item }) => (
           <Card style={styles.studentCard} onPress={() => openEdit(item)}>
             <View style={styles.studentRow}>
-              <Avatar name={`${item.first_name} ${item.last_name}`} size={44} />
+              <Avatar name={`${item.full_name}`} size={44} />
               <View style={styles.studentInfo}>
-                <Text style={styles.studentName}>{item.first_name} {item.last_name}</Text>
+                <Text style={styles.studentName}>{item.full_name} {}</Text>
                 <Text style={styles.studentId}>{item.admission_number}</Text>
                 {item.classes ? <Text style={styles.studentClass}>{item.classes.name} • {item.classes.grade_level}</Text> : null}
                 {item.email ? <Text style={styles.studentEmail}>{item.email}</Text> : null}
@@ -167,10 +166,10 @@ export default function StudentsScreen() {
               <View style={styles.form}>
                 <View style={styles.formRow}>
                   <View style={styles.formHalf}>
-                    <Input label="First Name *" value={form.first_name} onChangeText={(v) => setForm((f) => ({ ...f, first_name: v }))} placeholder="John" />
+                    <Input label="Full Name *" value={form.full_name} onChangeText={(v) => setForm((f) => ({ ...f, full_name: v }))} placeholder="John Doe" />
                   </View>
                   <View style={styles.formHalf}>
-                    <Input label="Last Name *" value={form.last_name} onChangeText={(v) => setForm((f) => ({ ...f, last_name: v }))} placeholder="Doe" />
+                    
                   </View>
                 </View>
                 <Input label="Email" value={form.email} onChangeText={(v) => setForm((f) => ({ ...f, email: v }))} keyboardType="email-address" autoCapitalize="none" leftIcon="email" placeholder="student@email.com" />

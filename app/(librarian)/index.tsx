@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { Colors, FontSize, FontWeight, Spacing, BorderRadius } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getLibraryBooks, getLibraryStats, getBorrowRecords } from '@/services/library.service';
+import { getBooks, getLibraryStats, getBorrows } from '@/services/library.service';
 
 const NAV = [
   { label: 'Library', icon: 'local-library' as const, route: '/(librarian)/' },
@@ -32,8 +32,8 @@ export default function LibrarianDashboard() {
     if (!school) return;
     const [statsRes, booksRes, borrowRes] = await Promise.all([
       getLibraryStats(school.id),
-      getLibraryBooks(school.id),
-      getBorrowRecords(school.id, 'borrowed'),
+      getBooks(school.id),
+      getBorrows(school.id, { status: 'borrowed' }),
     ]);
     setStats(statsRes);
     setBooks(booksRes.data || []);
@@ -111,7 +111,7 @@ export default function LibrarianDashboard() {
                       <Text style={s.borrowTitle}>{r.library_books?.title || 'Unknown Book'}</Text>
                       <Text style={s.borrowAuthor}>{r.library_books?.author}</Text>
                       <Text style={s.borrower}>
-                        {r.students ? `${r.students.first_name} ${r.students.last_name}` : r.borrower_name || 'Unknown'}
+                        {r.students ? `${r.students.full_name} ${r.}` : r.borrower_name || 'Unknown'}
                       </Text>
                     </View>
                     <View style={s.dueWrap}>

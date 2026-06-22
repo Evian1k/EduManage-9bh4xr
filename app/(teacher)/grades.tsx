@@ -88,7 +88,7 @@ export default function TeacherGrades() {
       selectedTerm, '2025/2026', score, schoolUser.id, remarks
     );
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowGrade(false);
     getGrades(school.id, selectedClass.id, selectedTerm).then(({ data }) => setGrades(data || []));
   };
@@ -128,7 +128,7 @@ export default function TeacherGrades() {
           ListEmptyComponent={<EmptyState icon="people" title="No Students" description="No students in this class." />}
           renderItem={({ item: student }) => (
             <Card style={styles.studentCard}>
-              <Text style={styles.studentName}>{student.first_name} {student.last_name}</Text>
+              <Text style={styles.studentName}>{student.full_name} {}</Text>
               <Text style={styles.studentId}>{student.admission_number}</Text>
               <View style={styles.subjectGrid}>
                 {subjects.slice(0, 4).map((subject) => {
@@ -162,7 +162,7 @@ export default function TeacherGrades() {
               <Text style={styles.modalTitle}>Record Grade</Text>
               <Pressable onPress={() => setShowGrade(false)} hitSlop={8}><MaterialIcons name="close" size={24} color={Colors.textPrimary} /></Pressable>
             </View>
-            <Text style={styles.modalSub}>{selectedStudent?.first_name} {selectedStudent?.last_name}</Text>
+            <Text style={styles.modalSub}>{selectedStudent?.full_name} {}</Text>
             <Text style={styles.modalSub2}>{selectedSubject?.name} • {selectedTerm}</Text>
             <View style={styles.scoreRow}>
               <Input label="Score (0-100)" value={scoreInput} onChangeText={setScoreInput} keyboardType="numeric" placeholder="Enter score" leftIcon="grade" />

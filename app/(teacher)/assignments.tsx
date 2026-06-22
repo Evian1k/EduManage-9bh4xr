@@ -69,7 +69,7 @@ export default function TeacherAssignments() {
       is_published: form.is_published,
     });
     setSaving(false);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     setShowCreate(false);
     setForm({ title: '', description: '', due_date: '', max_score: '100', assignment_type: 'homework', class_id: '', subject_id: '', is_published: false });
     load();
@@ -77,7 +77,7 @@ export default function TeacherAssignments() {
 
   const handleTogglePublish = async (a: any) => {
     const { error } = await toggleAssignmentPublish(a.id, !a.is_published);
-    if (error) { showAlert('Error', error.message); return; }
+    if (error) { showAlert('Error', error); return; }
     load();
   };
 

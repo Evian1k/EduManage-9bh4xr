@@ -104,7 +104,7 @@ export default function FinanceScreen() {
   if (loading) return <LoadingScreen message="Loading finance..." />;
 
   const collectionRate = stats ? ((stats.totalCollected / (stats.totalCollected + stats.totalOutstanding + 0.01)) * 100) : 0;
-  const filteredStudents = students.filter((s: any) => !studentSearch || `${s.first_name} ${s.last_name} ${s.admission_number}`.toLowerCase().includes(studentSearch.toLowerCase()));
+  const filteredStudents = students.filter((s: any) => !studentSearch || `${s.full_name} ${s.admission_number}`.toLowerCase().includes(studentSearch.toLowerCase()));
 
   return (
     <View style={s.flex}>
@@ -178,7 +178,7 @@ export default function FinanceScreen() {
                     <MaterialIcons name={p.status === 'paid' ? 'check-circle' : p.status === 'partial' ? 'pending' : 'cancel'} size={18} color={p.status === 'paid' ? Colors.success : p.status === 'partial' ? Colors.warning : Colors.error} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.payName}>{p.students ? `${p.students.first_name} ${p.students.last_name}` : 'Unknown'}</Text>
+                    <Text style={s.payName}>{p.students ? `${p.students.full_name}` : 'Unknown'}</Text>
                     <Text style={s.payFee}>{p.fee_structures?.name || 'General Payment'}</Text>
                     <Text style={s.payDate}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString() : 'Pending'}</Text>
                   </View>
@@ -234,8 +234,8 @@ export default function FinanceScreen() {
               {studentSearch && !newPayment.student_id ? (
                 <View style={s.dropdown}>
                   {filteredStudents.slice(0, 5).map((st: any) => (
-                    <Pressable key={st.id} style={s.dropItem} onPress={() => { setNewPayment(p => ({ ...p, student_id: st.id })); setStudentSearch(`${st.first_name} ${st.last_name}`); }}>
-                      <Text style={s.dropName}>{st.first_name} {st.last_name}</Text>
+                    <Pressable key={st.id} style={s.dropItem} onPress={() => { setNewPayment(p => ({ ...p, student_id: st.id })); setStudentSearch(`${st.full_name}`); }}>
+                      <Text style={s.dropName}>{st.full_name}</Text>
                       <Text style={s.dropSub}>{st.admission_number}</Text>
                     </Pressable>
                   ))}

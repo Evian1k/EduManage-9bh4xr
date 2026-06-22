@@ -5,8 +5,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/template';
 import { useAppContext } from '@/hooks/useAppContext';
-import { getSupabaseClient } from '@/template';
-import { FunctionsHttpError } from '@supabase/supabase-js';
+import { invokeAI } from '@/services/ai.service';
 import { BottomNav } from '@/components/layout/BottomNav';
 
 const STUDENT_NAV = [
@@ -48,21 +47,9 @@ export default function StudentAI() {
     setLoading(true);
 
     try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: {
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-          feature: 'chat',
-          school_id: school?.id,
-        },
-      });
-
+      const { data, error } = await invokeAI(school!.id, 'chat', newMessages.map((m) => ({ role: m.role as any, content: m.content })));
       if (error) {
-        let errorMsg = error.message;
-        if (error instanceof FunctionsHttpError) {
-          try { errorMsg = await error.context?.text() || error.message; } catch { errorMsg = error.message; }
-        }
-        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Sorry, I encountered an error: ${errorMsg}` }]);
+        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `Sorry, I encountered an error: ${error}` }]);
       } else {
         setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: data?.content || 'No response received.' }]);
       }

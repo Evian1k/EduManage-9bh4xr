@@ -194,7 +194,7 @@ export default function SettingsScreen() {
               iconColor={Colors.secondary}
               iconBg={Colors.infoBg}
               label="Accent Color"
-              hint="Personalized accent colors are coming soon."
+              hint='EduManage uses a dark theme optimized for readability.'
               showDivider={false}
               rightSlot={
                 <View style={[styles.colorDot, { backgroundColor: Colors.secondary }]} />
