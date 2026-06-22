@@ -12,13 +12,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { signInWithLockout } from '@/services/auth.security.service';
 
 // Dev-only demo accounts — accessible by long-pressing the logo 3 times.
-// These only work if you've seeded them via the seed-demo edge function.
-const DEV_DEMO_ACCOUNTS = [
+// ONLY available in development mode (__DEV__ = true).
+// In production builds, this array is empty and the feature is disabled.
+const DEV_DEMO_ACCOUNTS = __DEV__ ? [
   { label: 'Platform Owner', email: 'owner@edumanage.demo', password: 'Demo123!', icon: 'admin-panel-settings' as const, color: Colors.superAdmin },
   { label: 'School Admin', email: 'admin@greenfield.demo', password: 'Demo123!', icon: 'business' as const, color: Colors.schoolAdmin },
   { label: 'Teacher', email: 'teacher@greenfield.demo', password: 'Demo123!', icon: 'cast-for-education' as const, color: Colors.teacher },
   { label: 'Student', email: 'student@greenfield.demo', password: 'Demo123!', icon: 'school' as const, color: Colors.student },
-];
+] : [];
 
 function getLoginErrorMessage(errorMessage: string): string {
   const msg = errorMessage.toLowerCase();
@@ -52,7 +53,12 @@ export default function LoginScreen() {
   const [showDevAccounts, setShowDevAccounts] = useState(false);
   const [devLoading, setDevLoading] = useState<string | null>(null);
 
+  // Demo accounts ONLY visible in development mode (local dev on your PC).
+  // In production builds (__DEV__ is false), this is completely stripped out.
+  const isDevMode = __DEV__;
+
   const handleLogoPress = () => {
+    if (!isDevMode) return; // No-op in production
     const newCount = logoPressCount + 1;
     setLogoPressCount(newCount);
     if (newCount >= 3) {
@@ -190,7 +196,8 @@ export default function LoginScreen() {
         </Text>
       </ScrollView>
 
-      {/* Dev Demo Accounts Modal — hidden, only accessible via 3x logo press */}
+      {/* Dev Demo Accounts Modal — ONLY in dev mode, accessible via 3x logo press */}
+      {isDevMode && (
       <Modal visible={showDevAccounts} transparent animationType="slide" onRequestClose={() => setShowDevAccounts(false)}>
         <View style={styles.devOverlay}>
           <View style={styles.devModal}>
@@ -231,6 +238,7 @@ export default function LoginScreen() {
           </View>
         </View>
       </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 }
