@@ -1,16 +1,10 @@
 // EduManage — Realtime notifications hook
 //
 // Subscribes to the `notifications` table for the current user via Supabase
-// Realtime. Falls back to a 30-second polling loop if Realtime is unavailable
-// (e.g. network error or no Realtime subscription permission).
-//
-// Also exports registerPushToken/unregisterPushToken helpers that upsert/
-// delete rows in `user_devices` with the Expo push token stored in
-// `metadata.expo_push_token` (matching the send-push-notification edge fn).
+// Realtime. Falls back to a 30-second polling loop if Realtime is unavailable.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { getSupabaseClient } from '@/template';
-import { useAuth } from '@/template';
+import { getSupabaseClient, useAuth } from '@/template';
 import { Notification, ServiceResult } from '@/lib/types';
 
 interface UseRealtimeNotificationsResult {
@@ -22,23 +16,15 @@ interface UseRealtimeNotificationsResult {
 
 const POLL_INTERVAL_MS = 30_000;
 
-/**
- * Subscribe to the notifications table for the authenticated user. Returns
- * the current unread count, the most recent notification, and a `refresh`
- * callback that forces a re-fetch.
- *
- * @param profileId Optional override — defaults to the auth user's profile id.
- *                  Pass an explicit value when running outside the auth context.
- */
 export function useRealtimeNotifications(
   profileId?: string,
 ): UseRealtimeNotificationsResult {
   const { user } = useAuth();
-  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [latestNotification, setLatestNotification] = useState<Notification | null>(null);
   const [loading, setLoading] = useState(true);
-  const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null>(null);
-  const pollRef = ReturnType<typeof setInterval> extends never ? null : useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<any>(null);
+  const pollRef = useRef<any>(null);
 
   const fetchProfileId = useCallback(async (): Promise<string | null> => {
     if (profileId) return profileId;
@@ -102,13 +88,8 @@ export function useRealtimeNotifications(
         .channel(channelName)
         .on(
           'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${pid}`,
-          },
-          (payload) => {
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${pid}` },
+          (payload: any) => {
             const n = payload.new as Notification;
             setLatestNotification(n);
             setUnreadCount((c) => c + 1);
@@ -116,30 +97,15 @@ export function useRealtimeNotifications(
         )
         .on(
           'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${pid}`,
-          },
-          () => {
-            // re-fetch to recompute unread count (could be a read-mark)
-            void refresh();
-          },
+          { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${pid}` },
+          () => { void refresh(); },
         )
         .on(
           'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${pid}`,
-          },
-          () => {
-            void refresh();
-          },
+          { event: 'DELETE', schema: 'public', table: 'notifications', filter: `user_id=eq.${pid}` },
+          () => { void refresh(); },
         )
-        .subscribe((status) => {
+        .subscribe((status: string) => {
           if (status !== 'SUBSCRIBED') {
             console.warn('[useRealtimeNotifications] realtime status:', status);
           }
@@ -147,31 +113,19 @@ export function useRealtimeNotifications(
 
       channelRef.current = channel;
 
-      // Fallback polling — survives Realtime disconnects.
-      const interval = setInterval(() => {
-        void refresh();
-      }, POLL_INTERVAL_MS);
-      if (pollRef && typeof pollRef === 'object' && 'current' in pollRef) {
-        (pollRef as { current: ReturnType<typeof setInterval> | null }).current = interval;
-      }
+      const interval = setInterval(() => { void refresh(); }, POLL_INTERVAL_MS);
+      pollRef.current = interval;
     })();
 
     return () => {
       cancelled = true;
       if (channelRef.current) {
-        try {
-          getSupabaseClient().removeChannel(channelRef.current);
-        } catch {
-          /* ignore */
-        }
+        try { getSupabaseClient().removeChannel(channelRef.current); } catch { /* ignore */ }
         channelRef.current = null;
       }
-      if (pollRef && typeof pollRef === 'object' && 'current' in pollRef) {
-        const ref = pollRef as { current: ReturnType<typeof setInterval> | null };
-        if (ref.current) {
-          clearInterval(ref.current);
-          ref.current = null;
-        }
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,33 +154,20 @@ async function fetchProfileIdForAuthUser(authUserId: string): Promise<string | n
   return data.id as string;
 }
 
-/**
- * Upsert a user_devices row for the given profile + Expo push token. The
- * Expo token is stored in `metadata.expo_push_token`, which is what the
- * `send-push-notification` edge function reads when dispatching pushes.
- *
- * The device fingerprint is the unique key — if the device already has a row,
- * its metadata is merged with the new token (overwriting any prior token).
- */
 export async function registerPushToken(
   profileId: string,
   token: string,
 ): Promise<ServiceResult<UserDevice>> {
-  if (!profileId || !token) {
-    return { data: null, error: 'profileId and token are required' };
-  }
+  if (!profileId || !token) return { data: null, error: 'profileId and token are required' };
   const supabase = getSupabaseClient();
   const fingerprint = `expo:${token.slice(-32)}`;
-  // Try to find existing row first (so we can merge metadata cleanly).
   const { data: existing, error: findErr } = await supabase
     .from('user_devices')
     .select('*')
     .eq('user_id', profileId)
     .eq('device_fingerprint', fingerprint)
     .maybeSingle();
-  if (findErr) {
-    return { data: null, error: findErr.message };
-  }
+  if (findErr) return { data: null, error: findErr.message };
   const mergedMetadata = {
     ...((existing?.metadata as Record<string, unknown> | null) ?? {}),
     expo_push_token: token,
@@ -234,12 +175,7 @@ export async function registerPushToken(
   const { data, error } = await supabase
     .from('user_devices')
     .upsert(
-      {
-        user_id: profileId,
-        device_fingerprint: fingerprint,
-        metadata: mergedMetadata,
-        last_seen_at: new Date().toISOString(),
-      },
+      { user_id: profileId, device_fingerprint: fingerprint, metadata: mergedMetadata, last_seen_at: new Date().toISOString() },
       { onConflict: 'user_id,device_fingerprint' },
     )
     .select('*')
@@ -248,17 +184,11 @@ export async function registerPushToken(
   return { data: data as unknown as UserDevice, error: null };
 }
 
-/**
- * Remove a previously-registered Expo push token. Used on logout / uninstall
- * to stop pushes to a device that should no longer receive them.
- */
 export async function unregisterPushToken(
   profileId: string,
   token: string,
 ): Promise<ServiceResult<{ deleted: boolean }>> {
-  if (!profileId || !token) {
-    return { data: null, error: 'profileId and token are required' };
-  }
+  if (!profileId || !token) return { data: null, error: 'profileId and token are required' };
   const supabase = getSupabaseClient();
   const fingerprint = `expo:${token.slice(-32)}`;
   const { error } = await supabase
@@ -270,7 +200,6 @@ export async function unregisterPushToken(
   return { data: { deleted: true }, error: null };
 }
 
-/** Convenience: resolve a profile id from an auth user id, then register. */
 export async function registerPushTokenForAuthUser(
   authUserId: string,
   token: string,
@@ -280,7 +209,6 @@ export async function registerPushTokenForAuthUser(
   return registerPushToken(pid, token);
 }
 
-/** Convenience: resolve a profile id from an auth user id, then unregister. */
 export async function unregisterPushTokenForAuthUser(
   authUserId: string,
   token: string,
