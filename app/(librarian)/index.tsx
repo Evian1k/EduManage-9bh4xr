@@ -111,7 +111,7 @@ export default function LibrarianDashboard() {
                       <Text style={s.borrowTitle}>{r.library_books?.title || 'Unknown Book'}</Text>
                       <Text style={s.borrowAuthor}>{r.library_books?.author}</Text>
                       <Text style={s.borrower}>
-                        {r.students ? `${r.students.full_name} ${r.}` : r.borrower_name || 'Unknown'}
+                        {r.students ? r.students.full_name : r.borrower_name || 'Unknown'}
                       </Text>
                     </View>
                     <View style={s.dueWrap}>
