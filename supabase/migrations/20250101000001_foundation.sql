@@ -1,5 +1,5 @@
 -- EduManage — Multi-tenant SaaS Foundation
-create extension if not exists "uuid-ossp";
+
 create extension if not exists "pgcrypto";
 
 do $$ begin
@@ -12,7 +12,7 @@ do $$ begin create type domain_status as enum ('pending', 'verified', 'failed', 
 do $$ begin create type audit_severity as enum ('info', 'warning', 'critical'); exception when duplicate_object then null; end $$;
 
 create table if not exists public.schools (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null, slug text not null unique, subdomain text not null unique,
   country text, county text, city text, address text, phone text, email text, website text, motto text, logo_url text,
   primary_color text default '#0B1426', accent_color text default '#FFD700',
@@ -25,7 +25,7 @@ create table if not exists public.schools (
 create index if not exists idx_schools_subdomain on public.schools(subdomain);
 
 create table if not exists public.user_profiles (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   auth_user_id uuid unique, email text not null unique, full_name text, phone text, avatar_url text,
   default_school_id uuid references public.schools(id) on delete set null,
   mfa_enabled boolean default false, mfa_secret text,
@@ -38,7 +38,7 @@ create table if not exists public.user_profiles (
 create index if not exists idx_user_profiles_auth_user on public.user_profiles(auth_user_id);
 
 create table if not exists public.school_users (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   user_id uuid not null references public.user_profiles(id) on delete cascade,
   role user_role not null, is_active boolean default true, invited_by uuid references public.user_profiles(id),
@@ -50,7 +50,7 @@ create index if not exists idx_school_users_school on public.school_users(school
 create index if not exists idx_school_users_user on public.school_users(user_id);
 
 create table if not exists public.school_invitations (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   email text not null, role user_role not null, token text not null unique,
   invited_by uuid not null references public.user_profiles(id),
@@ -62,7 +62,7 @@ create index if not exists idx_invitations_school on public.school_invitations(s
 create index if not exists idx_invitations_token on public.school_invitations(token);
 
 create table if not exists public.custom_domains (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   domain text not null, domain_type text not null, verification_token text,
   verification_method text default 'txt', status domain_status default 'pending',
@@ -72,7 +72,7 @@ create table if not exists public.custom_domains (
 create unique index if not exists idx_custom_domains_domain on public.custom_domains(domain);
 
 create table if not exists public.subscription_plans (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tier subscription_plan not null unique, name text not null, description text,
   price_monthly_usd numeric(10,2) default 0, price_yearly_usd numeric(10,2) default 0,
   max_students integer default 500, max_staff integer default 50, max_storage_mb integer default 1024,
@@ -86,7 +86,7 @@ insert into public.subscription_plans (tier, name, description, price_monthly_us
 on conflict (tier) do nothing;
 
 create table if not exists public.subscriptions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   plan_tier subscription_plan not null default 'starter', status subscription_status not null default 'trialing',
   current_period_start timestamptz default now(), current_period_end timestamptz, trial_ends_at timestamptz,
@@ -97,7 +97,7 @@ create table if not exists public.subscriptions (
 create index if not exists idx_subscriptions_school on public.subscriptions(school_id);
 
 create table if not exists public.audit_logs (
-  id uuid default uuid_generate_v4(),
+  id uuid default gen_random_uuid(),
   school_id uuid references public.schools(id) on delete cascade,
   user_id uuid references public.user_profiles(id) on delete set null,
   action text not null, resource_type text, resource_id text, details jsonb default '{}'::jsonb,
@@ -112,7 +112,7 @@ create index if not exists idx_audit_school_created on public.audit_logs(school_
 create index if not exists idx_audit_action_created on public.audit_logs(action, created_at desc);
 
 create table if not exists public.notifications (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   school_id uuid references public.schools(id) on delete cascade,
   user_id uuid references public.user_profiles(id) on delete cascade,
   title text not null, body text, type text, category text, data jsonb default '{}'::jsonb,
@@ -121,7 +121,7 @@ create table if not exists public.notifications (
 create index if not exists idx_notifications_user on public.notifications(user_id);
 
 create table if not exists public.notification_preferences (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.user_profiles(id) on delete cascade,
   channel text not null, category text not null, enabled boolean default true,
   created_at timestamptz default now(), updated_at timestamptz default now(),
@@ -129,7 +129,7 @@ create table if not exists public.notification_preferences (
 );
 
 create table if not exists public.user_devices (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.user_profiles(id) on delete cascade,
   device_fingerprint text not null, device_name text, platform text,
   last_ip text, last_seen_at timestamptz default now(), trusted boolean default false,
@@ -138,7 +138,7 @@ create table if not exists public.user_devices (
 create index if not exists idx_user_devices_user on public.user_devices(user_id);
 
 create table if not exists public.rate_limit_log (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   identifier text not null, action text not null, created_at timestamptz default now()
 );
 create index if not exists idx_rate_limit_lookup on public.rate_limit_log(identifier, action, created_at);

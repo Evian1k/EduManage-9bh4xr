@@ -2,7 +2,7 @@
 
 -- Rulebook
 create table if not exists public.school_rule_acceptance (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   accepted_by_user_id uuid not null references public.user_profiles(id) on delete cascade,
   rulebook_version text not null default '1.0', accepted boolean not null default true,
