@@ -19,7 +19,7 @@ import {
   Subject,
 } from './school_management.service';
 
-export interface { SchoolClass, Stream, Subject };
+export type { SchoolClass, Stream, Subject };
 
 export const getClasses = mgmtGetClasses;
 
